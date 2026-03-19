@@ -11,11 +11,16 @@ const BUENO_IMAGE_BASE =
   'https://assets.bueno.art/images/b93fd12b-3c56-4f5d-9277-fa952f95cffb/default';
 
 // Position mapping from on-chain to game (spec Section 3.10)
+// On-chain uses: Forward, Center, Defense, Goalie, MetaBeauts (special 1-of-1s), Winger
 const POSITION_MAP: Record<string, Position> = {
   Forward: 'Winger',
+  Winger: 'Winger',
   Center: 'Center',
   Defense: 'Defender',
-  MetaBeauts: 'Goaltender',
+  Defender: 'Defender',
+  Goalie: 'Goaltender',
+  Goaltender: 'Goaltender',
+  MetaBeauts: 'Goaltender', // Special 1-of-1 legendaries
 };
 
 // Tier mapping from on-chain to game
@@ -27,23 +32,45 @@ const TIER_MAP: Record<string, Tier> = {
 };
 
 // Archetype → Trait mapping (spec Section 3.10)
+// On-chain archetypes verified from Bueno metadata sample (March 2026):
+//   Winger: Enforcer Forward, Grinder, Playmaker, Sniper, Dangler, Two-Way Forward
+//   Center: Playmaker, Dangler, Power Forward, Sniper
+//   Defense: Two-Way Defenseman, Enforcer Defenseman, Puck-Moving Defenseman, Defensive Defenseman
+//   Goalie: Butterfly, Stand-Up, Hybrid
+//   MetaBeauts (1-of-1s): Number 1, Big Swede, Burner, TBoz, DocG, El Teegs
 const ARCHETYPE_MAP: Record<string, TraitName> = {
-  'Number 1': 'Stand Up', // Goaltender archetype
-  'Two-Way Defenseman': 'Two-Way',
-  'Two-Way': 'Two-Way',
+  // Goalie archetypes
+  'Number 1': 'Stand Up',
+  'Stand-Up': 'Stand Up',
+  'Stand Up': 'Stand Up',
+  Butterfly: 'Butterfly',
+  Hybrid: 'Hybrid',
+  // Forward/Winger archetypes
+  'Enforcer Forward': 'Enforcer',
+  Enforcer: 'Enforcer',
   Sniper: 'Sniper',
   'Power Forward': 'Power Fwd',
   'Power Fwd': 'Power Fwd',
-  Enforcer: 'Enforcer',
   Dangler: 'Dangler',
-  'Two-Timer': 'Two-Timer',
-  Hybrid: 'Hybrid',
-  Playmaker: 'Playmaker',
   Grinder: 'Grinder',
+  Playmaker: 'Playmaker',
+  'Two-Way Forward': 'Two-Way',
+  // Defense archetypes
+  'Two-Way Defenseman': 'Two-Way',
+  'Two-Way': 'Two-Way',
+  'Enforcer Defenseman': 'Enforcer',
+  'Puck-Moving Defenseman': 'Puck Mover',
   'Puck Mover': 'Puck Mover',
-  Butterfly: 'Butterfly',
-  Offensive: 'Offensive',
+  'Defensive Defenseman': 'Defensive',
   Defensive: 'Defensive',
+  Offensive: 'Offensive',
+  'Two-Timer': 'Two-Timer',
+  // 1-of-1 MetaBeauts legendaries — unique traits
+  'Big Swede': 'Power Fwd',
+  Burner: 'Sniper',
+  TBoz: 'Playmaker',
+  DocG: 'Two-Way',
+  'El Teegs': 'Dangler',
 };
 
 interface OnChainAttribute {
@@ -145,26 +172,26 @@ export async function fetchBeautBatch(
   return fetchRosterMetadata(ids);
 }
 
-// Position counts (approximate from collection distribution)
+// Position counts — verified sample token IDs from Bueno metadata (March 2026)
 export const POSITION_DISTRIBUTION: Record<Position, { min: number; max: number; sample: number[] }> = {
   Winger: {
     min: 1,
     max: 9997,
-    sample: [3, 7, 15, 22, 35, 48, 56, 67, 89, 102, 115, 128, 134, 156, 178],
+    sample: [10, 30, 35, 50, 60, 80, 110, 160, 500, 600, 700, 1000, 2000, 3000, 5000],
   },
   Center: {
     min: 1,
     max: 9997,
-    sample: [5, 12, 18, 30, 43, 57, 71, 84, 96, 110, 123, 140, 155, 170, 185],
+    sample: [7, 15, 48, 70, 90, 100, 150, 200, 550, 650, 800, 1500, 2500, 4000, 7000],
   },
   Defender: {
     min: 1,
     max: 9997,
-    sample: [2, 9, 17, 26, 38, 50, 63, 75, 88, 100, 116, 130, 145, 160, 175],
+    sample: [20, 50, 120, 130, 170, 180, 250, 350, 750, 850, 950, 3500, 4500, 7500, 8500],
   },
   Goaltender: {
     min: 1,
     max: 9997,
-    sample: [1, 4, 10, 20, 33, 46, 58, 70, 82, 95, 108, 120, 135, 150, 165],
+    sample: [22, 55, 65, 85, 140, 190, 300, 400, 900, 1100, 1200, 5500, 6000, 8000, 9000],
   },
 };
