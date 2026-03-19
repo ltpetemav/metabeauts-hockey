@@ -1,22 +1,23 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/store/gameStore';
 import { ScoreBoard } from '@/components/ui/ScoreBoard';
 import { RinkLayout } from '@/components/game/RinkLayout';
 import { TurnPanel } from '@/components/game/TurnPanel';
 import { ResolutionModal } from '@/components/game/ResolutionModal';
-import { CardType, TraitName, RPSChoice } from '@/types/game';
+import { RPSChoice } from '@/types/game';
+import { HandoffScreen } from '@/components/game/HandoffScreen';
 
 export default function GamePage() {
   const router = useRouter();
   const {
     gameState,
     currentViewingPlayer,
-    switchViewToPlayer,
+    pendingHandoff,
+    confirmHandoff,
     showResolutionResult,
-    resolutionAnimating,
     submitRPSChoice,
     doLineChange,
     skipLineChange,
@@ -29,17 +30,6 @@ export default function GamePage() {
     setActiveDefensiveBeaut,
     resetGame,
   } = useGameStore();
-
-  const [autoSwitching, setAutoSwitching] = useState(false);
-
-  // Hot-seat: auto-switch after resolution
-  useEffect(() => {
-    if (gameState && !showResolutionResult && autoSwitching && gameState.phase === 'POSSESSION_START') {
-      const otherPlayer = currentViewingPlayer === 'player1' ? 'player2' : 'player1';
-      switchViewToPlayer(otherPlayer);
-      setAutoSwitching(false);
-    }
-  }, [showResolutionResult, autoSwitching, gameState, currentViewingPlayer, switchViewToPlayer]);
 
   if (!gameState) {
     return (
@@ -60,13 +50,12 @@ export default function GamePage() {
 
   const handleResolutionDismiss = () => {
     dismissResolution();
-    setAutoSwitching(true);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 to-blue-950 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header with player switch */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => router.push('/')}
@@ -74,20 +63,9 @@ export default function GamePage() {
           >
             ← Home
           </button>
-          <div className="flex gap-2">
-            {(['player1', 'player2'] as const).map(p => (
-              <button
-                key={p}
-                onClick={() => switchViewToPlayer(p)}
-                className={`px-4 py-2 rounded-lg font-bold transition-all ${
-                  currentViewingPlayer === p
-                    ? 'bg-white text-gray-900'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                {p === 'player1' ? '👤 P1' : '👤 P2'}
-              </button>
-            ))}
+          {/* Current viewing player indicator (read-only in hot-seat mode) */}
+          <div className="text-sm font-semibold text-gray-300">
+            {currentViewingPlayer === 'player1' ? '🔵 Player 1' : '🔴 Player 2'}&apos;s view
           </div>
           <button
             onClick={() => {
@@ -132,10 +110,7 @@ export default function GamePage() {
               viewingPlayer={currentViewingPlayer}
               onRPSSubmit={(player, choice) => submitRPSChoice(player, choice)}
               onSkipLineChange={(player) => skipLineChange(player)}
-              onLineChange={(player, swaps) => {
-                doLineChange(player, swaps);
-                setAutoSwitching(true);
-              }}
+              onLineChange={(player, swaps) => doLineChange(player, swaps)}
               onDrawCard={drawOffensiveCard}
               onSelectDefensiveCard={selectDefensiveCard}
               onActivateTrait={(player, trait) => activateTrait(player, trait)}
@@ -152,6 +127,11 @@ export default function GamePage() {
             viewingPlayer={currentViewingPlayer}
             onDismiss={handleResolutionDismiss}
           />
+        )}
+
+        {/* Hot-Seat Handoff Screen — renders on top of everything */}
+        {pendingHandoff && (
+          <HandoffScreen toPlayer={pendingHandoff} onReady={confirmHandoff} />
         )}
 
         {/* Match End Modal */}

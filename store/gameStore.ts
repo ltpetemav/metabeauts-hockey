@@ -47,6 +47,7 @@ interface GameStore {
 
   // UI-specific state
   currentViewingPlayer: 'player1' | 'player2'; // Hot-seat: which player is currently viewing
+  pendingHandoff: 'player1' | 'player2' | null; // Show handoff screen before switching view
   resolutionAnimating: boolean;
   showResolutionResult: boolean;
   lastAction: string | null;
@@ -83,6 +84,7 @@ interface GameStore {
   setRosterBrowsePosition: (pos: Position | null) => void;
 
   switchViewToPlayer: (player: 'player1' | 'player2') => void;
+  confirmHandoff: () => void; // Clears pendingHandoff and switches currentViewingPlayer
 
   resetGame: () => void;
 }
@@ -93,6 +95,7 @@ export const useGameStore = create<GameStore>()(
     selectedGameMode: 'RegularSeason',
     gameState: null,
     currentViewingPlayer: 'player1',
+    pendingHandoff: null,
     resolutionAnimating: false,
     showResolutionResult: false,
     lastAction: null,
@@ -172,7 +175,12 @@ export const useGameStore = create<GameStore>()(
       const { gameState } = get();
       if (!gameState) return;
       const newState = submitRPS(gameState, player, choice);
-      set({ gameState: newState, lastAction: `${player} chose ${choice}` });
+
+      // After P1 picks, hand off to P2. After P2 picks both are resolved — no handoff needed.
+      const pendingHandoff: 'player1' | 'player2' | null =
+        player === 'player1' ? 'player2' : null;
+
+      set({ gameState: newState, lastAction: `${player} chose ${choice}`, pendingHandoff });
     },
 
     doLineChange: (player, swaps) => {
@@ -182,14 +190,20 @@ export const useGameStore = create<GameStore>()(
       // After line change, advance phase if both done
       const offensivePlayer = gameState.possession;
       const defensivePlayer = offensivePlayer === 'player1' ? 'player2' : 'player1';
-      
+
+      let pendingHandoff: 'player1' | 'player2' | null = null;
+
       if (player === offensivePlayer) {
         newState = { ...newState, offensive_line_change_done: true };
+        // Offense done — hand off to defense for their line change decision
+        pendingHandoff = defensivePlayer;
       } else {
         newState = { ...newState, defensive_line_change_done: true };
+        // Defense done — both done, hand off to offensive player for the draw
+        pendingHandoff = offensivePlayer;
       }
 
-      set({ gameState: newState, lastAction: `${player} made a line change` });
+      set({ gameState: newState, lastAction: `${player} made a line change`, pendingHandoff });
     },
 
     skipLineChange: (player) => {
@@ -199,6 +213,7 @@ export const useGameStore = create<GameStore>()(
       const defensivePlayer = offensivePlayer === 'player1' ? 'player2' : 'player1';
 
       let newState = { ...gameState };
+      let pendingHandoff: 'player1' | 'player2' | null = null;
 
       if (player === offensivePlayer) {
         newState = { ...newState, offensive_line_change_done: true };
@@ -209,23 +224,34 @@ export const useGameStore = create<GameStore>()(
       // If both line changes resolved, move to offensive draw
       if (newState.offensive_line_change_done && newState.defensive_line_change_done) {
         newState = { ...newState, phase: 'OFFENSIVE_DRAW' };
+        // Hand off to offensive player to draw their card
+        pendingHandoff = offensivePlayer;
       } else if (newState.offensive_line_change_done) {
-        // Now it's defensive player's turn for line change
+        // Now it's defensive player's turn for line change — hand off to them
         newState = { ...newState, phase: 'LINE_CHANGE_DEFENSIVE' };
+        pendingHandoff = defensivePlayer;
       }
 
-      set({ gameState: newState, lastAction: `${player} skipped line change` });
+      set({ gameState: newState, lastAction: `${player} skipped line change`, pendingHandoff });
     },
 
     drawOffensiveCard: () => {
       const { gameState } = get();
       if (!gameState || gameState.phase !== 'OFFENSIVE_DRAW') return;
       const newState = performOffensiveDraw(gameState);
+
+      // After drawing, the defensive player needs to respond — hand off to them
+      const defensivePlayer =
+        gameState.possession === 'player1' ? 'player2' : 'player1';
+      const pendingHandoff: 'player1' | 'player2' | null =
+        newState.phase === 'DEFENSIVE_RESPONSE' ? defensivePlayer : null;
+
       set({
         gameState: newState,
         lastAction: newState.drawn_card
           ? `Drew: ${newState.drawn_card.card_type}`
           : 'Beaut exhausted!',
+        pendingHandoff,
       });
     },
 
@@ -271,15 +297,24 @@ export const useGameStore = create<GameStore>()(
     dismissResolution: () => {
       const { gameState } = get();
       if (!gameState) return;
-      
+
       // Apply catch-up traits if pending
       if (gameState.catch_up_traits_pending) {
         const newState = applyCatchUpTraits(gameState, gameState.catch_up_traits_pending.player_id);
         set({ gameState: newState, showResolutionResult: false });
         return;
       }
-      
-      set({ showResolutionResult: false });
+
+      // After resolution, determine who acts next for a handoff
+      // If going back to POSSESSION_START, the possession player is next
+      // If RPS (new possession round), default to player1 first for RPS
+      const nextPhase = gameState.phase;
+      let pendingHandoff: 'player1' | 'player2' | null = null;
+      if (nextPhase === 'POSSESSION_START' || nextPhase === 'RPS') {
+        pendingHandoff = gameState.possession;
+      }
+
+      set({ showResolutionResult: false, pendingHandoff });
     },
 
     applyCatchUp: () => {
@@ -307,13 +342,20 @@ export const useGameStore = create<GameStore>()(
     setLoadingBeauts: (loading) => set({ isLoadingBeauts: loading }),
     setRosterBrowsePosition: (pos) => set({ rosterBrowsePosition: pos }),
 
-    switchViewToPlayer: (player) => set({ currentViewingPlayer: player }),
+    switchViewToPlayer: (player) => set({ currentViewingPlayer: player, pendingHandoff: null }),
+
+    confirmHandoff: () => {
+      const { pendingHandoff } = get();
+      if (!pendingHandoff) return;
+      set({ currentViewingPlayer: pendingHandoff, pendingHandoff: null });
+    },
 
     resetGame: () =>
       set({
         gameState: null,
         rosterSelection: { player1: [], player2: [] },
         currentViewingPlayer: 'player1',
+        pendingHandoff: null,
         showResolutionResult: false,
         resolutionAnimating: false,
         lastAction: null,
