@@ -89,10 +89,11 @@ export const useTutorialStore = create<TutorialStore>()(
       const stepIndex = getLessonStartIndex(lesson);
       const gameState = createTutorialGameState();
 
-      // For lessons > 1, advance the game state to the right phase
-      // Lesson 2+ needs game to be past RPS and into possession
+      // For lessons that need the game past RPS (3, 4, 5),
+      // auto-advance. Lessons 1 and 2 start from the beginning
+      // so the player can experience RPS.
       let readyState = gameState;
-      if (lesson >= 2) {
+      if (lesson >= 3) {
         readyState = performScriptedRPS(gameState);
         readyState = performScriptedSkipBothLineChanges(readyState);
       }
@@ -133,9 +134,13 @@ export const useTutorialStore = create<TutorialStore>()(
       if (nextStep.lesson !== currentStep?.lesson) {
         // New lesson — create fresh game state appropriately
         const freshState = createTutorialGameState();
-        newGameState = nextStep.lesson >= 2
-          ? performScriptedSkipBothLineChanges(performScriptedRPS(freshState))
-          : freshState;
+        if (nextStep.lesson >= 3) {
+          // Lessons 3+ start past RPS and line changes
+          newGameState = performScriptedSkipBothLineChanges(performScriptedRPS(freshState));
+        } else {
+          // Lessons 1-2 start fresh (lesson 2 needs RPS to still be showing)
+          newGameState = freshState;
+        }
       }
 
       set({
