@@ -262,8 +262,15 @@ export const useTutorialStore = create<TutorialStore>()(
           finalState = applyCatchUpTraits(finalState, finalState.catch_up_traits_pending.player_id);
         }
 
-        // Debug: log can_shoot for tutorial tracing
-        console.log('[Tutorial] Resolution:', stateToResolve.drawn_card?.card_type, 'vs', stateToResolve.defensive_selected_card?.card_type, '→ can_shoot:', finalState.can_shoot, 'outcome:', resolved.last_resolution?.outcome);
+        // Force can_shoot based on resolution outcome:
+        // If offense drew Pass/Skate and won, can_shoot MUST be true
+        const drawnType = stateToResolve.drawn_card?.card_type;
+        if ((drawnType === 'Pass' || drawnType === 'Skate') && 
+            resolved.last_resolution?.outcome !== 'DEFENSE_WINS') {
+          finalState = { ...finalState, can_shoot: true };
+        }
+
+        console.log('[Tutorial] Resolution:', drawnType, 'vs', stateToResolve.defensive_selected_card?.card_type, '→ can_shoot:', finalState.can_shoot, 'outcome:', resolved.last_resolution?.outcome);
 
         set({
           gameState: finalState,
