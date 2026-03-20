@@ -323,6 +323,28 @@ export const useTutorialStore = create<TutorialStore>()(
         scriptedDefensePending: step.scriptedDefensiveCard || null,
       });
 
+      // If this step expects the resolve button (TRAIT_WINDOW phase),
+      // auto-skip trait activations so the "Resolve Action!" button appears.
+      // Exception: lesson 4 teaches traits, so don't auto-skip there.
+      if (step.phase === 'TRAIT_WINDOW' && step.lesson !== 4) {
+        const { gameState } = get();
+        if (gameState && gameState.phase === 'TRAIT_WINDOW') {
+          // Mark all beauts' trait cards as spent so TurnPanel's hasForcedTrait = false
+          // This makes it skip the "Activate / Skip" UI and show "Resolve Action!" directly
+          const spendTraits = (beauts: any[]) => beauts.map((b: any) => ({
+            ...b,
+            trait_card: b.trait_card ? { ...b.trait_card, is_spent: true } : null,
+          }));
+          set({
+            gameState: {
+              ...gameState,
+              player1: { ...gameState.player1, beauts: spendTraits(gameState.player1.beauts) },
+              player2: { ...gameState.player2, beauts: spendTraits(gameState.player2.beauts) },
+            },
+          });
+        }
+      }
+
       // Auto-advance steps
       if (step.waitFor === 'auto' && step.autoAdvanceMs) {
         setTimeout(() => {
