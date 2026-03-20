@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Position } from '@/types/game';
 import { BeautCard } from '@/components/ui/BeautCard';
@@ -40,7 +41,6 @@ export default function RosterPage() {
   };
 
   useEffect(() => {
-    // Load initial beauts — start with Wingers (most common pick first)
     const load = async () => {
       setLoadingBeauts(true);
       setSelectedPosition('Winger');
@@ -80,27 +80,56 @@ export default function RosterPage() {
   const canStart = rosterSelection.player1.length === 6 && rosterSelection.player2.length === 6;
 
   return (
-    <div className="min-h-screen bg-gray-950 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
+    <div className="min-h-screen bg-gray-950"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      {/* Fixed top bar on mobile */}
+      <div className="sticky top-0 z-30 bg-gray-950/95 backdrop-blur border-b border-gray-800 px-3 py-2 sm:hidden">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={() => router.push('/')}
+            className="text-gray-400 hover:text-white text-sm min-h-[44px] flex items-center"
+          >
+            ← Back
+          </button>
+          <h1 className="text-base font-black text-white">🏒 Build Rosters</h1>
+          {canStart && (
+            <button
+              onClick={() => { startGame(); router.push('/game'); }}
+              className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white font-bold text-sm min-h-[44px]"
+            >
+              Play! 🎮
+            </button>
+          )}
+          {!canStart && (
+            <div className="text-xs text-gray-400 text-right">
+              <div>P1: {rosterSelection.player1.length}/6</div>
+              <div>P2: {rosterSelection.player2.length}/6</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-3 py-3 sm:p-4">
+        {/* Desktop header */}
+        <div className="mb-6 hidden sm:block">
           <button
             onClick={() => router.push('/')}
             className="text-gray-400 hover:text-white mb-4"
           >
             ← Back
           </button>
-          <h1 className="text-4xl font-black text-white mb-2">🏒 Build Your Rosters</h1>
-          <p className="text-gray-400">
+          <h1 className="text-3xl sm:text-4xl font-black text-white mb-2">🏒 Build Your Rosters</h1>
+          <p className="text-gray-400 text-sm sm:text-base">
             Each player picks 6 Beauts: 2 Wingers, 1 Center, 2 Defenders, 1 Goaltender
           </p>
         </div>
 
         {/* Game Mode Select */}
-        <div className="mb-6 flex gap-4">
+        <div className="mb-4 flex flex-col sm:flex-row gap-2 sm:gap-4">
           <button
             onClick={() => setGameMode('PreSeason')}
-            className={`px-4 py-2 rounded-lg font-bold transition-all ${
+            className={`flex-1 sm:flex-none px-4 py-3 rounded-lg font-bold transition-all text-sm min-h-[48px] ${
               selectedGameMode === 'PreSeason'
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
@@ -110,7 +139,7 @@ export default function RosterPage() {
           </button>
           <button
             onClick={() => setGameMode('RegularSeason')}
-            className={`px-4 py-2 rounded-lg font-bold transition-all ${
+            className={`flex-1 sm:flex-none px-4 py-3 rounded-lg font-bold transition-all text-sm min-h-[48px] ${
               selectedGameMode === 'RegularSeason'
                 ? 'bg-green-600 text-white'
                 : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
@@ -120,11 +149,30 @@ export default function RosterPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Player selector — sticky on mobile */}
+        <div className="sticky top-[58px] sm:top-0 z-20 bg-gray-950/95 backdrop-blur -mx-3 px-3 py-2 mb-3 sm:static sm:bg-transparent sm:backdrop-blur-none sm:mx-0 sm:px-0 sm:py-0 sm:mb-6 border-b border-gray-800/50 sm:border-0">
+          <div className="flex gap-2">
+            {(['player1', 'player2'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setBrowsingPlayer(p)}
+                className={`flex-1 py-2.5 rounded-lg font-bold transition-all text-sm min-h-[44px] ${
+                  browsingPlayer === p
+                    ? 'bg-white text-gray-900'
+                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                {p === 'player1' ? 'Player 1' : 'Player 2'} ({rosterSelection[p].length}/6)
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4">
           {/* Beauts Browser */}
-          <div className="lg:col-span-2">
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-              <h2 className="text-xl font-bold text-white mb-4">📋 Browse MetaBeauts</h2>
+          <div className="order-2 lg:order-1 lg:col-span-2">
+            <div className="bg-gray-900 border border-gray-700 rounded-xl p-3 sm:p-4">
+              <h2 className="text-base sm:text-xl font-bold text-white mb-3">📋 Browse MetaBeauts</h2>
 
               {/* Position filter */}
               <div className="flex gap-2 mb-4 flex-wrap">
@@ -133,7 +181,7 @@ export default function RosterPage() {
                     key={pos}
                     onClick={() => loadByPosition(pos)}
                     disabled={isLoadingBeauts}
-                    className={`px-3 py-2 rounded-lg font-bold transition-all ${
+                    className={`px-3 py-2.5 rounded-lg font-bold transition-all text-sm min-h-[44px] ${
                       selectedPosition === pos
                         ? 'bg-white text-gray-900'
                         : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -148,7 +196,10 @@ export default function RosterPage() {
               {isLoadingBeauts ? (
                 <div className="text-center py-8 text-gray-400">🔄 Loading beauts...</div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[600px] overflow-y-auto">
+                <div
+                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[500px] sm:max-h-[600px] overflow-y-auto"
+                  style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+                >
                   {browsedBeauts.map(beaut => {
                     const isSelected = roster.some(b => b.token_id === beaut.token_id);
                     const posCount = positionCounts[beaut.position];
@@ -176,37 +227,17 @@ export default function RosterPage() {
 
               {browsedBeauts.length === 0 && !isLoadingBeauts && (
                 <div className="text-center py-8 text-gray-400">
-                  No beauts found for this position. Try another filter ⬆️
+                  No beauts found. Try another filter ⬆️
                 </div>
               )}
             </div>
           </div>
 
-          {/* Roster Summary */}
-          <div className="flex flex-col gap-4">
-            {/* Player selector */}
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-              <h3 className="font-bold text-white mb-2">Editing Roster:</h3>
-              <div className="flex gap-2">
-                {(['player1', 'player2'] as const).map(p => (
-                  <button
-                    key={p}
-                    onClick={() => setBrowsingPlayer(p)}
-                    className={`flex-1 py-2 rounded-lg font-bold transition-all ${
-                      browsingPlayer === p
-                        ? 'bg-white text-gray-900'
-                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                    }`}
-                  >
-                    {p === 'player1' ? 'Player 1' : 'Player 2'} ({rosterSelection[p].length}/6)
-                  </button>
-                ))}
-              </div>
-            </div>
-
+          {/* Roster Summary — on mobile comes FIRST (order-1) */}
+          <div className="order-1 lg:order-2 flex flex-col gap-3">
             {/* Current roster */}
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-              <h3 className="font-bold text-white mb-3">
+            <div className="bg-gray-900 border border-gray-700 rounded-xl p-3 sm:p-4">
+              <h3 className="font-bold text-white mb-3 text-sm sm:text-base">
                 {browsingPlayer === 'player1' ? 'Player 1' : 'Player 2'} Roster ({roster.length}/6)
               </h3>
 
@@ -214,7 +245,7 @@ export default function RosterPage() {
                 const beautsInPos = roster.filter(b => b.position === pos);
                 const limit = POSITION_LIMITS[pos];
                 return (
-                  <div key={pos} className="mb-3">
+                  <div key={pos} className="mb-2">
                     <div className="text-xs text-gray-400 mb-1">
                       {POSITION_ICONS[pos]} {pos} ({beautsInPos.length}/{limit})
                     </div>
@@ -226,8 +257,8 @@ export default function RosterPage() {
                           <button
                             key={b.token_id}
                             onClick={() => removeBeautFromRoster(browsingPlayer, b.token_id)}
-                            className="text-xs bg-gray-800 hover:bg-red-700 text-gray-300 hover:text-white px-2 py-1 rounded transition-all"
-                            title="Click to remove"
+                            className="text-xs bg-gray-800 hover:bg-red-700 text-gray-300 hover:text-white px-2 py-1.5 rounded transition-all min-h-[36px]"
+                            title="Tap to remove"
                           >
                             {b.name.replace('MetaBeauts #', '#')} ✕
                           </button>
@@ -239,10 +270,10 @@ export default function RosterPage() {
               })}
             </div>
 
-            {/* Player 2 roster preview */}
+            {/* Player 2 roster preview (when viewing P1) */}
             {browsingPlayer === 'player1' && (
-              <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-                <h3 className="font-bold text-white mb-2">
+              <div className="bg-gray-900 border border-gray-700 rounded-xl p-3 sm:p-4">
+                <h3 className="font-bold text-white mb-2 text-sm sm:text-base">
                   Player 2 Roster ({rosterSelection.player2.length}/6)
                 </h3>
                 {rosterSelection.player2.length === 0 ? (
@@ -256,24 +287,22 @@ export default function RosterPage() {
             )}
 
             {/* Start button */}
-            {canStart && (
+            {canStart ? (
               <button
                 onClick={() => {
                   startGame();
                   router.push('/game');
                 }}
-                className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 text-white font-black text-lg transition-all hover:scale-105 shadow-lg"
+                className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 active:bg-green-700 text-white font-black text-base sm:text-lg transition-all hover:scale-105 shadow-lg min-h-[56px]"
               >
                 🎮 Start Game!
               </button>
-            )}
-
-            {!canStart && (
+            ) : (
               <div className="bg-gray-800 rounded-xl p-3 text-center">
                 <div className="text-xs text-gray-400">
                   {rosterSelection.player1.length === 6 ? '✅' : '⏳'} Player 1: {rosterSelection.player1.length}/6
                 </div>
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-gray-400 mt-1">
                   {rosterSelection.player2.length === 6 ? '✅' : '⏳'} Player 2: {rosterSelection.player2.length}/6
                 </div>
               </div>

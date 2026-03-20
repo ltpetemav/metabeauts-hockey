@@ -162,7 +162,7 @@ export function BeautCard({
   );
 }
 
-// Mini version for bench/scoreboard
+// Mini version for bench/scoreboard — touch-friendly
 export function BeautMini({
   beaut,
   isActive = false,
@@ -181,8 +181,10 @@ export function BeautMini({
   return (
     <div
       className={`
-        relative flex flex-col items-center p-1 rounded-lg border cursor-pointer
-        transition-all duration-150 hover:scale-105
+        relative flex flex-col items-center p-1 rounded-lg border
+        transition-all duration-150 hover:scale-105 active:scale-95
+        min-w-[52px] min-h-[52px]
+        ${onClick ? 'cursor-pointer' : 'cursor-default'}
         ${isActive ? 'border-white bg-white/20 scale-105' : 'border-gray-600 bg-gray-800/60'}
         ${exhausted ? 'opacity-40 grayscale' : ''}
       `}
@@ -192,13 +194,13 @@ export function BeautMini({
       <img
         src={beaut.image_url}
         alt={beaut.name}
-        className="w-10 h-10 rounded object-cover"
+        className="w-10 h-10 sm:w-10 sm:h-10 rounded object-cover"
         loading="lazy"
         onError={(e) => {
           (e.target as HTMLImageElement).src = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' fill='%23374151'><rect width='40' height='40'/><text x='20' y='25' text-anchor='middle' fill='%239ca3af' font-size='10'>${beaut.token_id ?? '?'}</text></svg>`;
         }}
       />
-      <span className="text-xs text-gray-300 truncate max-w-12 text-center">{beaut.name.replace('MetaBeauts #', '#')}</span>
+      <span className="text-xs text-gray-300 truncate max-w-[52px] text-center">{beaut.name.replace('MetaBeauts #', '#')}</span>
       <span className={`text-xs font-bold ${cards === 0 ? 'text-red-400' : 'text-green-400'}`}>
         {POSITION_ICONS[beaut.position]} {cards}
       </span>

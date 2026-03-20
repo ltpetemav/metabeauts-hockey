@@ -60,9 +60,9 @@ export function ActionCardUI({
   const type = card?.card_type ?? cardType;
 
   const sizeClasses = {
-    sm: 'w-16 h-20 text-xs',
-    md: 'w-20 h-28 text-sm',
-    lg: 'w-24 h-32 text-base',
+    sm: 'w-14 h-20 sm:w-16 sm:h-20 text-xs',
+    md: 'w-16 h-24 sm:w-20 sm:h-28 text-xs sm:text-sm min-h-[60px]',
+    lg: 'w-20 h-28 sm:w-24 sm:h-32 text-sm sm:text-base',
   };
 
   if (isFaceDown) {

@@ -56,7 +56,9 @@ function TutorialGameContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-blue-950 p-4 pb-36">
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-blue-950 px-3 py-3 sm:p-4 pb-48 sm:pb-36"
+      style={{ paddingTop: `max(env(safe-area-inset-top), 12px)` }}
+    >
       <div className="max-w-7xl mx-auto">
 
         {/* Header */}
@@ -102,21 +104,10 @@ function TutorialGameContent() {
           </div>
         </div>
 
-        {/* Main game area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Rink */}
-          <div className="lg:col-span-2" data-tutorial-id="tutorial-rink-ice">
-            <RinkLayout
-              gameState={gameState}
-              viewingPlayer={currentViewingPlayer}
-              onSelectOffensiveBeaut={() => {}}
-              onSelectDefensiveBeaut={() => {}}
-            />
-          </div>
-
-          {/* Turn Panel */}
-          <div data-tutorial-id="tutorial-turn-panel">
-            {/* Draw button / resolve button spotlights */}
+        {/* Main game area — TurnPanel first on mobile */}
+        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3">
+          {/* Turn Panel — first on mobile */}
+          <div className="order-1 lg:order-2 lg:col-start-3" data-tutorial-id="tutorial-turn-panel">
             <TurnPanelWithSpotlights
               gameState={gameState}
               viewingPlayer={currentViewingPlayer}
@@ -126,6 +117,16 @@ function TutorialGameContent() {
               onSelectDefensiveCard={selectDefensiveCard}
               onActivateTrait={() => {}}
               onConfirmResolution={handleConfirmResolution}
+            />
+          </div>
+
+          {/* Rink — second on mobile */}
+          <div className="order-2 lg:order-1 lg:col-span-2 lg:col-start-1 lg:row-start-1" data-tutorial-id="tutorial-rink-ice">
+            <RinkLayout
+              gameState={gameState}
+              viewingPlayer={currentViewingPlayer}
+              onSelectOffensiveBeaut={() => {}}
+              onSelectDefensiveBeaut={() => {}}
             />
           </div>
         </div>

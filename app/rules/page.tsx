@@ -22,32 +22,34 @@ export default function RulesPage() {
   const [activeSection, setActiveSection] = useState<Section>('overview');
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-blue-950 p-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-blue-950"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className="max-w-4xl mx-auto px-3 py-3 sm:p-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => router.push('/')}
-            className="text-gray-400 hover:text-white transition-colors text-sm"
+            className="text-gray-400 hover:text-white transition-colors text-sm min-h-[44px] flex items-center"
           >
-            ← Back to Home
+            ← Back
           </button>
-          <h1 className="text-2xl font-black text-white">📖 Rules & FAQ</h1>
+          <h1 className="text-lg sm:text-2xl font-black text-white">📖 Rules & FAQ</h1>
           <button
             onClick={() => router.push('/tutorial')}
-            className="text-blue-400 hover:text-blue-300 transition-colors text-sm"
+            className="text-blue-400 hover:text-blue-300 transition-colors text-sm min-h-[44px] flex items-center"
           >
-            🎓 Try Tutorial →
+            🎓 Tutorial →
           </button>
         </div>
 
-        {/* Section Nav */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        {/* Section Nav — scrollable row on mobile */}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 sm:flex-wrap">
           {SECTIONS.map((s) => (
             <button
               key={s.id}
               onClick={() => setActiveSection(s.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap min-h-[44px] flex-shrink-0 ${
                 activeSection === s.id
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
@@ -59,7 +61,7 @@ export default function RulesPage() {
         </div>
 
         {/* Content */}
-        <div className="bg-gray-900/80 border border-gray-700 rounded-2xl p-6 text-gray-200 leading-relaxed">
+        <div className="bg-gray-900/80 border border-gray-700 rounded-2xl p-4 sm:p-6 text-gray-200 leading-relaxed">
           {activeSection === 'overview' && <OverviewSection />}
           {activeSection === 'setup' && <SetupSection />}
           {activeSection === 'turns' && <TurnsSection />}
@@ -121,8 +123,8 @@ function SetupSection() {
       <SectionTitle>📋 Setup & Roster</SectionTitle>
       <p className="mb-4">Each player drafts a team of <strong>6 Beauts</strong> from the MetaBeauts collection:</p>
 
-      <div className="bg-gray-800 rounded-xl p-4 mb-4">
-        <table className="w-full text-sm">
+      <div className="bg-gray-800 rounded-xl p-3 sm:p-4 mb-4 overflow-x-auto">
+        <table className="w-full text-xs sm:text-sm min-w-[260px]">
           <thead>
             <tr className="text-gray-400 border-b border-gray-700">
               <th className="text-left py-2">Position</th>
@@ -206,8 +208,8 @@ function CardsSection() {
       </ul>
 
       <SubTitle>Resolution Matrix</SubTitle>
-      <div className="bg-gray-800 rounded-xl p-4 overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="bg-gray-800 rounded-xl p-3 sm:p-4 overflow-x-auto">
+        <table className="w-full text-xs sm:text-sm min-w-[320px]">
           <thead>
             <tr className="text-gray-400 border-b border-gray-700">
               <th className="text-left py-2">Off ↓ / Def →</th>

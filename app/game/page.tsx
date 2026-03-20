@@ -33,13 +33,13 @@ export default function GamePage() {
 
   if (!gameState) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4">
         <div className="text-center">
           <div className="text-4xl mb-4">🎮</div>
           <h1 className="text-2xl font-bold text-white mb-2">No game in progress</h1>
           <button
             onClick={() => router.push('/roster')}
-            className="mt-4 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold"
+            className="mt-4 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold min-h-[48px]"
           >
             ← Back to Roster Selection
           </button>
@@ -53,33 +53,35 @@ export default function GamePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-blue-950 p-4">
-      <div className="max-w-7xl mx-auto">
+    <div
+      className="min-h-screen bg-gradient-to-b from-gray-950 to-blue-950"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className="max-w-7xl mx-auto px-3 py-3 md:p-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => router.push('/')}
-            className="text-gray-400 hover:text-white text-sm"
+            className="text-gray-400 hover:text-white text-sm min-h-[44px] min-w-[44px] flex items-center"
           >
             ← Home
           </button>
-          {/* Current viewing player indicator (read-only in hot-seat mode) */}
-          <div className="text-sm font-semibold text-gray-300">
-            {currentViewingPlayer === 'player1' ? '🔵 Player 1' : '🔴 Player 2'}&apos;s view
+          <div className="text-xs sm:text-sm font-semibold text-gray-300">
+            {currentViewingPlayer === 'player1' ? '🔵 P1' : '🔴 P2'}&apos;s view
           </div>
           <button
             onClick={() => {
               resetGame();
               router.push('/roster');
             }}
-            className="text-gray-400 hover:text-white text-sm"
+            className="text-gray-400 hover:text-white text-sm min-h-[44px] min-w-[44px] flex items-center justify-end"
           >
-            New Game →
+            New →
           </button>
         </div>
 
         {/* Scoreboard */}
-        <div className="mb-4">
+        <div className="mb-3">
           <ScoreBoard
             player1Score={gameState.player1_score}
             player2Score={gameState.player2_score}
@@ -91,20 +93,13 @@ export default function GamePage() {
           />
         </div>
 
-        {/* Main game area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Rink (center/left) */}
-          <div className="lg:col-span-2">
-            <RinkLayout
-              gameState={gameState}
-              viewingPlayer={currentViewingPlayer}
-              onSelectOffensiveBeaut={setActiveOffensiveBeaut}
-              onSelectDefensiveBeaut={setActiveDefensiveBeaut}
-            />
-          </div>
-
-          {/* Turn panel (right) */}
-          <div>
+        {/* Main game area
+            Mobile: TurnPanel first (most interactive), then Rink below
+            Desktop (lg): Rink left (2/3), TurnPanel right (1/3)
+        */}
+        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3">
+          {/* TurnPanel — on mobile rendered FIRST so it's immediately visible */}
+          <div className="order-1 lg:order-2 lg:col-start-3">
             <TurnPanel
               gameState={gameState}
               viewingPlayer={currentViewingPlayer}
@@ -115,6 +110,16 @@ export default function GamePage() {
               onSelectDefensiveCard={selectDefensiveCard}
               onActivateTrait={(player, trait) => activateTrait(player, trait)}
               onConfirmResolution={confirmResolution}
+            />
+          </div>
+
+          {/* Rink — on mobile rendered SECOND (below TurnPanel) */}
+          <div className="order-2 lg:order-1 lg:col-span-2 lg:col-start-1 lg:row-start-1">
+            <RinkLayout
+              gameState={gameState}
+              viewingPlayer={currentViewingPlayer}
+              onSelectOffensiveBeaut={setActiveOffensiveBeaut}
+              onSelectDefensiveBeaut={setActiveDefensiveBeaut}
             />
           </div>
         </div>
@@ -136,10 +141,10 @@ export default function GamePage() {
 
         {/* Match End Modal */}
         {gameState.phase === 'MATCH_END' && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70">
-            <div className="bg-gray-900 border-2 border-yellow-500 rounded-2xl p-8 max-w-md w-full text-center">
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
+            <div className="bg-gray-900 border-2 border-yellow-500 rounded-2xl p-6 sm:p-8 w-full max-w-md text-center">
               <div className="text-6xl mb-4">🏆</div>
-              <h2 className="text-4xl font-black text-yellow-400 mb-3">
+              <h2 className="text-3xl sm:text-4xl font-black text-yellow-400 mb-3">
                 {gameState.winner === currentViewingPlayer ? 'YOU WIN!' : 'GAME OVER'}
               </h2>
               <div className="text-2xl text-white font-bold mb-4">
@@ -153,7 +158,7 @@ export default function GamePage() {
                   resetGame();
                   router.push('/roster');
                 }}
-                className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold text-lg transition-all"
+                className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold text-lg transition-all min-h-[56px]"
               >
                 🎮 New Game
               </button>

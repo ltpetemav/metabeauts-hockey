@@ -156,9 +156,10 @@ function CoachWidget({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 40, opacity: 0 }}
       transition={{ type: 'spring', damping: 20, stiffness: 200 }}
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4"
+      className="fixed bottom-0 left-0 right-0 z-50 px-3 sm:px-4"
+      style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}
     >
-      <div className="bg-gray-900 border border-blue-500 rounded-2xl shadow-2xl shadow-blue-900/40 overflow-hidden">
+      <div className="bg-gray-900 border border-blue-500 rounded-2xl shadow-2xl shadow-blue-900/40 overflow-hidden max-w-lg mx-auto">
         {/* Header bar */}
         <div className="flex items-center justify-between px-4 py-2 bg-gray-800/80 border-b border-gray-700">
           <div className="flex items-center gap-2">
@@ -212,7 +213,7 @@ function CoachWidget({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               onClick={onAdvance}
-              className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-all hover:scale-[1.02] active:scale-95"
+              className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm transition-all hover:scale-[1.02] active:scale-95 min-h-[48px]"
             >
               Got it →
             </motion.button>
@@ -335,22 +336,24 @@ interface LessonSelectProps {
 
 export function LessonSelectScreen({ onSelectLesson }: LessonSelectProps) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-gray-950 to-blue-950 p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-gray-950 to-blue-950 p-4 sm:p-6"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <div className="max-w-lg w-full">
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-3">🏒</div>
-          <h1 className="text-4xl font-black text-white mb-2">Learn the Game</h1>
-          <p className="text-gray-400">Coach B walks you through every mechanic. Do them in order for the full experience.</p>
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="text-5xl sm:text-6xl mb-3">🏒</div>
+          <h1 className="text-3xl sm:text-4xl font-black text-white mb-2">Learn the Game</h1>
+          <p className="text-gray-400 text-sm sm:text-base">Coach B walks you through every mechanic. Do them in order for the full experience.</p>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {[1, 2, 3, 4, 5].map(lesson => (
             <motion.button
               key={lesson}
               whileHover={{ scale: 1.02, x: 4 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onSelectLesson(lesson)}
-              className="w-full flex items-center gap-4 bg-gray-900 hover:bg-gray-800 border border-gray-700 hover:border-blue-600 rounded-xl px-5 py-4 transition-all text-left group"
+              className="w-full flex items-center gap-3 sm:gap-4 bg-gray-900 hover:bg-gray-800 border border-gray-700 hover:border-blue-600 rounded-xl px-4 sm:px-5 py-3 sm:py-4 transition-all text-left group min-h-[64px]"
             >
               <div className="text-3xl">{LESSON_EMOJIS[lesson]}</div>
               <div className="flex-1">

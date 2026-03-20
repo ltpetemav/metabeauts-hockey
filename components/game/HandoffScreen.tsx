@@ -17,31 +17,33 @@ export function HandoffScreen({ toPlayer, onReady }: HandoffScreenProps) {
       : 'bg-red-600 hover:bg-red-500 border-red-400';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950 px-4"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       {/* Hockey rink ice texture hints */}
       <div className="absolute inset-0 opacity-5 pointer-events-none">
         <div className="w-full h-full bg-gradient-to-br from-blue-400 to-cyan-600" />
       </div>
 
-      <div className="relative text-center px-8 max-w-md w-full">
+      <div className="relative text-center max-w-md w-full">
         {/* Hockey puck icon */}
-        <div className="text-8xl mb-6 animate-bounce">🏒</div>
+        <div className="text-6xl sm:text-8xl mb-4 sm:mb-6 animate-bounce">🏒</div>
 
-        <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
+        <h1 className="text-2xl sm:text-4xl font-black text-white mb-2 tracking-tight">
           Pass the device to
         </h1>
 
-        <div className={`text-5xl font-black mb-8 ${playerColor} drop-shadow-lg`}>
+        <div className={`text-3xl sm:text-5xl font-black mb-6 sm:mb-8 ${playerColor} drop-shadow-lg`}>
           {playerEmoji} {playerLabel}
         </div>
 
-        <p className="text-gray-400 text-lg mb-10 leading-relaxed">
+        <p className="text-gray-400 text-base sm:text-lg mb-8 sm:mb-10 leading-relaxed">
           The other player must look away while you hand off the device.
         </p>
 
         <button
           onClick={onReady}
-          className={`w-full py-5 rounded-2xl font-black text-2xl text-white border-2 transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg ${buttonColor}`}
+          className={`w-full py-5 rounded-2xl font-black text-xl sm:text-2xl text-white border-2 transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg min-h-[64px] ${buttonColor}`}
         >
           I&apos;m Ready — Let&apos;s Play! 🎮
         </button>

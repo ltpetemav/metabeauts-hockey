@@ -64,29 +64,29 @@ export default function HomePage() {
           </div>
 
           {/* Title */}
-          <h1 className="text-6xl md:text-8xl font-black text-white mb-2 tracking-tight"
+          <h1 className="text-5xl sm:text-6xl md:text-8xl font-black text-white mb-2 tracking-tight"
             style={{
               textShadow: '0 0 80px rgba(0,216,255,0.3), 0 0 40px rgba(0,216,255,0.1)',
             }}
           >
             META<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">BEAUTS</span>
           </h1>
-          <h2 className="text-3xl md:text-5xl font-black text-white/90 mb-6 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-white/90 mb-4 tracking-tight">
             : HOCKEY
           </h2>
 
           {/* Tagline */}
-          <p className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto mb-8 leading-relaxed">
+          <p className="text-base md:text-xl text-gray-300 max-w-2xl mx-auto mb-8 leading-relaxed px-2">
             A 2-player PvP digital card game. Random offense, deliberate defense.
             <br className="hidden md:block" />
             Draft your roster. Hit the ice. First to 3 goals wins.
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12 w-full max-w-sm sm:max-w-none mx-auto">
             <button
               onClick={() => router.push('/roster')}
-              className="group relative px-10 py-4 rounded-full font-bold text-lg text-white transition-all duration-300 hover:scale-105 hover:-translate-y-1"
+              className="group relative px-8 py-4 rounded-full font-bold text-lg text-white transition-all duration-300 hover:scale-105 active:scale-95 min-h-[52px]"
               style={{
                 background: 'linear-gradient(135deg, #00d8ff 0%, #00b2e6 100%)',
                 boxShadow: '0 6px 24px rgba(0,216,255,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
@@ -96,13 +96,13 @@ export default function HomePage() {
             </button>
             <button
               onClick={() => router.push('/tutorial')}
-              className="px-10 py-4 rounded-full font-bold text-lg text-cyan-300 border-2 border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-500/10 transition-all duration-300 hover:scale-105 hover:-translate-y-1 backdrop-blur-sm"
+              className="px-8 py-4 rounded-full font-bold text-lg text-cyan-300 border-2 border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-500/10 transition-all duration-300 hover:scale-105 active:scale-95 backdrop-blur-sm min-h-[52px]"
             >
               🎓 Learn to Play
             </button>
             <button
               onClick={() => router.push('/rules')}
-              className="px-10 py-4 rounded-full font-bold text-lg text-gray-300 border-2 border-gray-600 hover:border-gray-400 hover:bg-white/5 transition-all duration-300 hover:scale-105 hover:-translate-y-1 backdrop-blur-sm"
+              className="px-8 py-4 rounded-full font-bold text-lg text-gray-300 border-2 border-gray-600 hover:border-gray-400 hover:bg-white/5 transition-all duration-300 hover:scale-105 active:scale-95 backdrop-blur-sm min-h-[52px]"
             >
               📖 Rules
             </button>
@@ -113,7 +113,7 @@ export default function HomePage() {
         <div className="relative z-10 w-full max-w-4xl mx-auto px-4"
           style={{ transform: `translateY(${scrollY * 0.15}px)` }}
         >
-          <div className="flex justify-center items-end -space-x-4 md:-space-x-6">
+          <div className="flex justify-center items-end -space-x-3 md:-space-x-6">
             {HERO_BEAUT_IDS.map((id, i) => (
               <div
                 key={id}
@@ -127,7 +127,7 @@ export default function HomePage() {
                   <img
                     src={beautImageUrl(id)}
                     alt={`Beaut #${id}`}
-                    className="w-20 h-20 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-xl object-cover border-2 border-white/20 shadow-2xl"
+                    className="w-12 h-12 sm:w-20 sm:h-20 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-xl object-cover border-2 border-white/20 shadow-2xl"
                     style={{
                       boxShadow: '0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(0,216,255,0.15)',
                     }}
@@ -215,10 +215,10 @@ export default function HomePage() {
             <p className="text-lg text-gray-400">Every card has exactly one counter. Learn the matchups.</p>
           </div>
 
-          <div className="bg-[#0b1730] border border-cyan-500/20 rounded-2xl p-6 overflow-x-auto shadow-2xl"
+          <div className="bg-[#0b1730] border border-cyan-500/20 rounded-2xl p-3 md:p-6 overflow-x-auto shadow-2xl"
             style={{ boxShadow: '0 0 60px rgba(0,216,255,0.08)' }}
           >
-            <table className="w-full text-sm md:text-base">
+            <table className="w-full text-xs sm:text-sm md:text-base min-w-[300px]">
               <thead>
                 <tr className="text-gray-400 border-b border-gray-700">
                   <th className="text-left py-3 px-2 font-semibold">Off ↓ / Def →</th>
@@ -271,7 +271,7 @@ export default function HomePage() {
           </div>
 
           {/* Scrolling showcase */}
-          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {SHOWCASE_IDS.map((id) => (
               <div
                 key={id}
@@ -369,20 +369,20 @@ export default function HomePage() {
       </section>
 
       {/* ═══ FOOTER ═══ */}
-      <footer className="bg-[#050e1d] py-8 border-t border-gray-800">
+      <footer className="bg-[#050e1d] py-6 border-t border-gray-800 safe-bottom">
         <div className="max-w-5xl mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col items-center gap-3 text-center">
             <div className="text-gray-500 text-sm">
               <span className="font-bold text-gray-400">MB:H</span> — MetaBeauts: Hockey • Phase 1 MVP
             </div>
             <div className="flex gap-6 text-sm text-gray-500">
-              <a href="https://metabeauts.io" target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400 transition-colors">
+              <a href="https://metabeauts.io" target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400 transition-colors min-h-[44px] flex items-center">
                 MetaBeauts.io
               </a>
-              <a href="https://opensea.io/collection/metabeauts" target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400 transition-colors">
+              <a href="https://opensea.io/collection/metabeauts" target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400 transition-colors min-h-[44px] flex items-center">
                 OpenSea
               </a>
-              <button onClick={() => router.push('/rules')} className="hover:text-cyan-400 transition-colors">
+              <button onClick={() => router.push('/rules')} className="hover:text-cyan-400 transition-colors min-h-[44px]">
                 Rules
               </button>
             </div>

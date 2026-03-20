@@ -26,8 +26,12 @@ export function ResolutionModal({ result, gameState, viewingPlayer, onDismiss }:
     : 'border-green-600 bg-green-950/90';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className={`rounded-2xl border-2 p-6 max-w-md w-full mx-4 ${outcomeBg}`}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className={`rounded-t-2xl sm:rounded-2xl border-2 p-5 sm:p-6 w-full sm:max-w-md sm:mx-4 max-h-[90vh] overflow-y-auto ${outcomeBg}`}
+        style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+      >
         {/* Header */}
         <div className="text-center mb-4">
           {goalScored ? (
@@ -106,7 +110,7 @@ export function ResolutionModal({ result, gameState, viewingPlayer, onDismiss }:
         {/* Dismiss */}
         <button
           onClick={onDismiss}
-          className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition-all"
+          className="w-full py-4 rounded-xl bg-white/10 hover:bg-white/20 active:bg-white/30 text-white font-bold transition-all min-h-[56px]"
         >
           {gameState.winner ? '🏆 View Final Score' : 'Continue →'}
         </button>
