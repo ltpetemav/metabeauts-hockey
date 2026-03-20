@@ -40,11 +40,12 @@ export default function RosterPage() {
   };
 
   useEffect(() => {
-    // Load initial beauts
+    // Load initial beauts — start with Wingers (most common pick first)
     const load = async () => {
       setLoadingBeauts(true);
+      setSelectedPosition('Winger');
       try {
-        const beauts = await fetchBeautBatch(1, 30);
+        const beauts = await searchBeautsByPosition('Winger', 25);
         setBrowsedBeauts(beauts);
       } catch (err) {
         console.error('Failed to load beauts:', err);
@@ -53,7 +54,8 @@ export default function RosterPage() {
       }
     };
     load();
-  }, [setLoadingBeauts, setBrowsedBeauts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadByPosition = async (pos: Position) => {
     setLoadingBeauts(true);
@@ -174,7 +176,7 @@ export default function RosterPage() {
 
               {browsedBeauts.length === 0 && !isLoadingBeauts && (
                 <div className="text-center py-8 text-gray-400">
-                  ⬆️ Select a position to browse beauts
+                  No beauts found for this position. Try another filter ⬆️
                 </div>
               )}
             </div>
