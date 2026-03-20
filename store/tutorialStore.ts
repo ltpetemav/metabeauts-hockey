@@ -1,0 +1,335 @@
+/**
+ * Tutorial Store — separate Zustand store for tutorial state.
+ * Does NOT modify gameStore.ts.
+ */
+
+import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
+import { GameState, CardType, TraitName, RPSChoice } from '@/types/game';
+import {
+  createTutorialGameState,
+  performScriptedOffensiveDraw,
+  performScriptedDefensiveResponse,
+  performScriptedRPS,
+  performScriptedSkipBothLineChanges,
+} from '@/lib/tutorial/tutorialEngine';
+import {
+  TUTORIAL_STEPS,
+  TutorialStep,
+  getLessonStartIndex,
+} from '@/lib/tutorial/tutorialScript';
+import {
+  submitRPS,
+  executeResolution,
+  performOffensiveDraw,
+  submitDefensiveResponse,
+  setActiveOffensiveBeaut,
+  setActiveDefensiveBeaut,
+  applyCatchUpTraits,
+} from '@/lib/engine/gameEngine';
+import { availableCards } from '@/lib/engine/cards';
+
+export type TutorialPhase =
+  | 'LESSON_SELECT'   // Choose which lesson
+  | 'PLAYING'         // In tutorial
+  | 'COMPLETE';       // All done
+
+interface TutorialStore {
+  // Meta
+  tutorialPhase: TutorialPhase;
+  currentStepIndex: number;
+  currentLesson: number;
+
+  // Game state (tutorial-specific, wraps real engine)
+  gameState: GameState | null;
+
+  // UI state
+  showResolutionResult: boolean;
+  resolutionAnimating: boolean;
+  currentViewingPlayer: 'player1' | 'player2';
+
+  // Scripted overrides active?
+  scriptedDrawPending: CardType | null;
+  scriptedDefensePending: CardType | null;
+  awaitingAutoDefense: boolean; // Waiting to auto-play defense after overlay advance
+
+  // Actions
+  startLesson: (lesson: number) => void;
+  advanceStep: () => void;
+  handleSpotlightClick: () => void; // Player clicked the spotlighted element
+  resetTutorial: () => void;
+  completeTutorial: () => void;
+
+  // Game actions (mirrored from gameStore, but tutorial-aware)
+  submitRPSChoice: (choice: RPSChoice) => void;
+  skipLineChange: () => void;
+  drawCard: () => void;
+  selectDefensiveCard: (cardId: string) => void;
+  confirmResolution: () => void;
+  dismissResolution: () => void;
+
+  // Internal
+  _applyStep: (step: TutorialStep) => void;
+}
+
+export const useTutorialStore = create<TutorialStore>()(
+  subscribeWithSelector((set, get) => ({
+    tutorialPhase: 'LESSON_SELECT',
+    currentStepIndex: 0,
+    currentLesson: 1,
+    gameState: null,
+    showResolutionResult: false,
+    resolutionAnimating: false,
+    currentViewingPlayer: 'player1',
+    scriptedDrawPending: null,
+    scriptedDefensePending: null,
+    awaitingAutoDefense: false,
+
+    startLesson: (lesson) => {
+      const stepIndex = getLessonStartIndex(lesson);
+      const gameState = createTutorialGameState();
+
+      // For lessons > 1, advance the game state to the right phase
+      // Lesson 2+ needs game to be past RPS and into possession
+      let readyState = gameState;
+      if (lesson >= 2) {
+        readyState = performScriptedRPS(gameState);
+        readyState = performScriptedSkipBothLineChanges(readyState);
+      }
+
+      set({
+        tutorialPhase: 'PLAYING',
+        currentLesson: lesson,
+        currentStepIndex: stepIndex,
+        gameState: readyState,
+        showResolutionResult: false,
+        resolutionAnimating: false,
+        currentViewingPlayer: 'player1',
+        scriptedDrawPending: null,
+        scriptedDefensePending: null,
+        awaitingAutoDefense: false,
+      });
+
+      // Apply the first step
+      const step = TUTORIAL_STEPS[stepIndex];
+      if (step) get()._applyStep(step);
+    },
+
+    advanceStep: () => {
+      const { currentStepIndex, gameState } = get();
+      const nextIndex = currentStepIndex + 1;
+
+      if (nextIndex >= TUTORIAL_STEPS.length) {
+        set({ tutorialPhase: 'COMPLETE' });
+        return;
+      }
+
+      const nextStep = TUTORIAL_STEPS[nextIndex];
+
+      // If we're transitioning to a new lesson, reset game for that lesson context
+      const currentStep = TUTORIAL_STEPS[currentStepIndex];
+      let newGameState = gameState;
+
+      if (nextStep.lesson !== currentStep?.lesson) {
+        // New lesson — create fresh game state appropriately
+        const freshState = createTutorialGameState();
+        newGameState = nextStep.lesson >= 2
+          ? performScriptedSkipBothLineChanges(performScriptedRPS(freshState))
+          : freshState;
+      }
+
+      set({
+        currentStepIndex: nextIndex,
+        currentLesson: nextStep.lesson,
+        gameState: newGameState,
+        scriptedDrawPending: nextStep.scriptedOffensiveDraw || null,
+        scriptedDefensePending: nextStep.scriptedDefensiveCard || null,
+        awaitingAutoDefense: false,
+      });
+
+      get()._applyStep(nextStep);
+    },
+
+    handleSpotlightClick: () => {
+      const { currentStepIndex, gameState } = get();
+      const step = TUTORIAL_STEPS[currentStepIndex];
+      if (!step || step.waitFor !== 'click-spotlight') return;
+
+      // Handle the action based on step id
+      const { scriptedDrawPending, scriptedDefensePending } = get();
+
+      // RPS click
+      if (step.phase === 'RPS' && gameState) {
+        const newState = performScriptedRPS(gameState);
+        set({ gameState: newState });
+        get().advanceStep();
+        return;
+      }
+
+      // Line change skip
+      if (step.phase === 'POSSESSION_START' && gameState) {
+        const newState = performScriptedSkipBothLineChanges(gameState);
+        set({ gameState: newState });
+        get().advanceStep();
+        return;
+      }
+
+      // Offensive draw
+      if (step.phase === 'OFFENSIVE_DRAW' && gameState) {
+        let newState = gameState;
+        if (scriptedDrawPending) {
+          newState = performScriptedOffensiveDraw(gameState, scriptedDrawPending);
+        } else {
+          newState = performOffensiveDraw(gameState);
+        }
+
+        // If there's a scripted defense, auto-apply it
+        if (scriptedDefensePending && newState.phase === 'DEFENSIVE_RESPONSE') {
+          newState = performScriptedDefensiveResponse(newState, scriptedDefensePending);
+        }
+
+        set({
+          gameState: newState,
+          scriptedDrawPending: null,
+          awaitingAutoDefense: !!scriptedDefensePending,
+        });
+        get().advanceStep();
+        return;
+      }
+
+      // Trait window / resolve
+      if (step.phase === 'TRAIT_WINDOW' && gameState) {
+        // Just resolve
+        get().confirmResolution();
+        return;
+      }
+
+      // Default: advance
+      get().advanceStep();
+    },
+
+    submitRPSChoice: (choice) => {
+      const { gameState } = get();
+      if (!gameState) return;
+      // In tutorial, RPS always results in player1 winning
+      const newState = performScriptedRPS(gameState);
+      set({ gameState: newState });
+    },
+
+    skipLineChange: () => {
+      const { gameState } = get();
+      if (!gameState) return;
+      const newState = performScriptedSkipBothLineChanges(gameState);
+      set({ gameState: newState });
+    },
+
+    drawCard: () => {
+      const { gameState, scriptedDrawPending, scriptedDefensePending } = get();
+      if (!gameState || gameState.phase !== 'OFFENSIVE_DRAW') return;
+
+      let newState: GameState;
+      if (scriptedDrawPending) {
+        newState = performScriptedOffensiveDraw(gameState, scriptedDrawPending);
+      } else {
+        newState = performOffensiveDraw(gameState);
+      }
+
+      // Auto-play defense if scripted
+      if (scriptedDefensePending && newState.phase === 'DEFENSIVE_RESPONSE') {
+        newState = performScriptedDefensiveResponse(newState, scriptedDefensePending);
+      }
+
+      set({
+        gameState: newState,
+        scriptedDrawPending: null,
+      });
+    },
+
+    selectDefensiveCard: (cardId) => {
+      const { gameState } = get();
+      if (!gameState || gameState.phase !== 'DEFENSIVE_RESPONSE') return;
+      const newState = submitDefensiveResponse(gameState, cardId);
+      set({ gameState: newState });
+    },
+
+    confirmResolution: () => {
+      const { gameState } = get();
+      if (!gameState || gameState.phase !== 'TRAIT_WINDOW') return;
+      if (!gameState.drawn_card || !gameState.defensive_selected_card) return;
+
+      set({ resolutionAnimating: true });
+
+      setTimeout(() => {
+        const resolved = executeResolution(gameState);
+
+        // Apply catch-up if needed
+        let finalState = resolved;
+        if (finalState.catch_up_traits_pending) {
+          finalState = applyCatchUpTraits(finalState, finalState.catch_up_traits_pending.player_id);
+        }
+
+        set({
+          gameState: finalState,
+          resolutionAnimating: false,
+          showResolutionResult: true,
+        });
+      }, 800);
+    },
+
+    dismissResolution: () => {
+      const { gameState } = get();
+      if (!gameState) return;
+
+      // After resolution dismiss, reset to next draw state
+      let newState = { ...gameState };
+      if (newState.phase === 'POSSESSION_START') {
+        // Skip line changes for tutorial
+        newState = performScriptedSkipBothLineChanges(newState);
+      }
+
+      set({
+        gameState: newState,
+        showResolutionResult: false,
+      });
+    },
+
+    resetTutorial: () => {
+      set({
+        tutorialPhase: 'LESSON_SELECT',
+        currentStepIndex: 0,
+        currentLesson: 1,
+        gameState: null,
+        showResolutionResult: false,
+        resolutionAnimating: false,
+        scriptedDrawPending: null,
+        scriptedDefensePending: null,
+        awaitingAutoDefense: false,
+      });
+    },
+
+    completeTutorial: () => {
+      set({ tutorialPhase: 'COMPLETE' });
+    },
+
+    _applyStep: (step) => {
+      // Pre-set scripted cards for this step
+      set({
+        scriptedDrawPending: step.scriptedOffensiveDraw || null,
+        scriptedDefensePending: step.scriptedDefensiveCard || null,
+      });
+
+      // Auto-advance steps
+      if (step.waitFor === 'auto' && step.autoAdvanceMs) {
+        setTimeout(() => {
+          // Auto-apply defense if needed
+          const { gameState, scriptedDefensePending } = get();
+          if (gameState && scriptedDefensePending && gameState.phase === 'DEFENSIVE_RESPONSE') {
+            const newState = performScriptedDefensiveResponse(gameState, scriptedDefensePending);
+            set({ gameState: newState, scriptedDefensePending: null });
+          }
+          get().advanceStep();
+        }, step.autoAdvanceMs);
+      }
+    },
+  }))
+);
