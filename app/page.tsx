@@ -57,7 +57,7 @@ export default function HomePage() {
             🎓 Learn to Play
           </button>
           <button
-            onClick={() => router.push('/game')}
+            onClick={() => router.push('/rules')}
             className="px-8 py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-lg transition-all hover:scale-105"
           >
             📖 Rules
