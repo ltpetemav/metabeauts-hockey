@@ -262,7 +262,7 @@ const lesson4Steps: TutorialStep[] = [
     lesson: 4,
     stepIndex: 1,
     dialogue: "See that purple glow? That's a Forced trait card. You choose WHEN to activate it — before resolution. Timing is everything. Waste it and it's gone.",
-    spotlight: 'tutorial-trait-card',
+    spotlight: 'tutorial-turn-panel',
     waitFor: 'advance',
   },
   {
@@ -277,7 +277,7 @@ const lesson4Steps: TutorialStep[] = [
     lesson: 4,
     stepIndex: 3,
     dialogue: "The Trait Activation Window opens AFTER defense picks their card but BEFORE resolution. Both players can activate their trait in that window. Then it resolves.",
-    spotlight: 'tutorial-trait-window',
+    spotlight: 'tutorial-turn-panel',
     waitFor: 'advance',
   },
   {
@@ -285,7 +285,7 @@ const lesson4Steps: TutorialStep[] = [
     lesson: 4,
     stepIndex: 4,
     dialogue: "Line changes. Every 3 turns, you can swap a tired Beaut for a fresh one from the bench. Bench Beauts recover — they get new cards while resting.",
-    spotlight: 'tutorial-rink-bench',
+    spotlight: 'tutorial-rink-ice',
     waitFor: 'advance',
   },
   {
@@ -329,7 +329,7 @@ const lesson5Steps: TutorialStep[] = [
     lesson: 5,
     stepIndex: 1,
     dialogue: "Watch your opponent's card piles. If their Goalie is almost empty, attack! If their Defender has a stack of Blocks, be patient and wait for a Skate to open a lane.",
-    spotlight: 'tutorial-rink-top',
+    spotlight: 'tutorial-rink-ice',
     waitFor: 'advance',
   },
   {

@@ -58,9 +58,14 @@ function useSpotlightRect(spotlightId: string | undefined): SpotlightRect | null
         return;
       }
       const r = el.getBoundingClientRect();
+      // Use raw viewport coords — overlay uses fixed positioning
+      if (r.width === 0 && r.height === 0) {
+        setRect(null);
+        return;
+      }
       setRect({
-        top: r.top + window.scrollY,
-        left: r.left + window.scrollX,
+        top: r.top,
+        left: r.left,
         width: r.width,
         height: r.height,
       });
@@ -303,7 +308,7 @@ function SpotlightOverlay({ spotlightId, onSpotlightClick, waitFor }: SpotlightO
         }}
       />
 
-      {/* Spotlight cutout — clickable if waitFor is click-spotlight */}
+      {/* Spotlight cutout — always allows pointer events through so real buttons work */}
       <div
         className={`fixed z-40 rounded-xl transition-all ${
           waitFor === 'click-spotlight'
@@ -315,9 +320,8 @@ function SpotlightOverlay({ spotlightId, onSpotlightClick, waitFor }: SpotlightO
           left: `${left}px`,
           width: `${width}px`,
           height: `${height}px`,
-          pointerEvents: waitFor === 'click-spotlight' ? 'auto' : 'none',
+          pointerEvents: 'none',
         }}
-        onClick={waitFor === 'click-spotlight' ? onSpotlightClick : undefined}
       />
     </>
   );

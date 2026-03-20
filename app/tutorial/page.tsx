@@ -10,7 +10,6 @@ import { TurnPanel } from '@/components/game/TurnPanel';
 import { ResolutionModal } from '@/components/game/ResolutionModal';
 import { TUTORIAL_STEPS } from '@/lib/tutorial/tutorialScript';
 import { RPSChoice } from '@/types/game';
-import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Tutorial Game Content ─────────────────────────────────────────────────
 // Renders the actual game UI with tutorial-aware data attributes for spotlights
@@ -125,19 +124,13 @@ function TutorialGameContent() {
         {/* Main game area */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Rink */}
-          <div className="lg:col-span-2">
-            <div data-tutorial-id="tutorial-rink-ice">
-              <div data-tutorial-id="tutorial-rink-top">
-                <div data-tutorial-id="tutorial-rink-bench">
-                  <RinkLayout
-                    gameState={gameState}
-                    viewingPlayer={currentViewingPlayer}
-                    onSelectOffensiveBeaut={() => {}}
-                    onSelectDefensiveBeaut={() => {}}
-                  />
-                </div>
-              </div>
-            </div>
+          <div className="lg:col-span-2" data-tutorial-id="tutorial-rink-ice">
+            <RinkLayout
+              gameState={gameState}
+              viewingPlayer={currentViewingPlayer}
+              onSelectOffensiveBeaut={() => {}}
+              onSelectDefensiveBeaut={() => {}}
+            />
           </div>
 
           {/* Turn Panel */}
@@ -152,7 +145,6 @@ function TutorialGameContent() {
               onSelectDefensiveCard={selectDefensiveCard}
               onActivateTrait={() => {}}
               onConfirmResolution={handleConfirmResolution}
-              currentStep={currentStep}
             />
           </div>
         </div>
@@ -189,15 +181,25 @@ interface TurnPanelWithSpotlightsProps {
   onSelectDefensiveCard: (cardId: string) => void;
   onActivateTrait: (player: 'player1' | 'player2', trait: any) => void;
   onConfirmResolution: () => void;
-  currentStep: any;
 }
 
 function TurnPanelWithSpotlights(props: TurnPanelWithSpotlightsProps) {
-  const { currentStep, gameState } = props;
+  const { gameState } = props;
+
+  // Determine which phase-specific spotlight ID to put on the turn panel wrapper.
+  // This way, phase-specific IDs (tutorial-rps-area, tutorial-draw-btn, etc.)
+  // target the actual visible turn panel content, not invisible zero-size anchors.
+  const phaseSpotlightId =
+    gameState.phase === 'RPS' ? 'tutorial-rps-area' :
+    gameState.phase === 'OFFENSIVE_DRAW' ? 'tutorial-draw-btn' :
+    gameState.phase === 'TRAIT_WINDOW' ? 'tutorial-resolve-btn' :
+    gameState.phase === 'DEFENSIVE_RESPONSE' ? 'tutorial-drawn-card' :
+    undefined;
 
   return (
-    <div className="relative">
-      {/* Wrap entire TurnPanel */}
+    <div
+      data-tutorial-id={phaseSpotlightId}
+    >
       <TurnPanel
         gameState={props.gameState}
         viewingPlayer={props.viewingPlayer}
@@ -208,38 +210,6 @@ function TurnPanelWithSpotlights(props: TurnPanelWithSpotlightsProps) {
         onSelectDefensiveCard={props.onSelectDefensiveCard}
         onActivateTrait={props.onActivateTrait}
         onConfirmResolution={props.onConfirmResolution}
-      />
-
-      {/* Spotlight anchors overlaid on top of the panel buttons */}
-      {/* These invisible divs carry the data-tutorial-id for spotlighting specific buttons */}
-      <div
-        data-tutorial-id="tutorial-rps-area"
-        className="absolute inset-0 pointer-events-none rounded-xl"
-        style={{ display: gameState.phase === 'RPS' ? 'block' : 'none' }}
-      />
-      <div
-        data-tutorial-id="tutorial-draw-btn"
-        className="absolute inset-0 pointer-events-none rounded-xl"
-        style={{ display: gameState.phase === 'OFFENSIVE_DRAW' ? 'block' : 'none' }}
-      />
-      <div
-        data-tutorial-id="tutorial-resolve-btn"
-        className="absolute inset-0 pointer-events-none rounded-xl"
-        style={{ display: gameState.phase === 'TRAIT_WINDOW' ? 'block' : 'none' }}
-      />
-      <div
-        data-tutorial-id="tutorial-drawn-card"
-        className="absolute inset-0 pointer-events-none rounded-xl"
-        style={{ display: gameState.drawn_card ? 'block' : 'none' }}
-      />
-      <div
-        data-tutorial-id="tutorial-trait-window"
-        className="absolute inset-0 pointer-events-none rounded-xl"
-        style={{ display: gameState.phase === 'TRAIT_WINDOW' ? 'block' : 'none' }}
-      />
-      <div
-        data-tutorial-id="tutorial-trait-card"
-        className="absolute inset-0 pointer-events-none rounded-xl"
       />
     </div>
   );
@@ -259,7 +229,7 @@ function TutorialRosterDisplay({ gameState }: { gameState: any }) {
         📋 Your Tutorial Roster — Player 1
       </h3>
       <div className="flex flex-wrap gap-3">
-        {p1.beauts.map((b: any) => (
+        {p1.beauts.map((b: any, idx: number) => (
           <div
             key={b.id}
             className="flex items-center gap-2 bg-gray-800 rounded-lg px-3 py-2 border border-gray-700"
@@ -270,28 +240,25 @@ function TutorialRosterDisplay({ gameState }: { gameState: any }) {
                b.position === 'Defender' ? '🛡️' : '🥅'}
             </div>
             <div>
-              <div
-                className="text-white text-xs font-semibold truncate max-w-[140px]"
-                data-tutorial-id="tutorial-archetype-badge"
-              >
+              <div className="text-white text-xs font-semibold truncate max-w-[140px]">
                 {b.name}
               </div>
               <div className="flex items-center gap-1 mt-0.5">
                 <span
                   className="text-xs text-blue-300 bg-blue-900/40 px-1 rounded"
-                  data-tutorial-id="tutorial-position-badges"
+                  {...(idx === 0 ? { 'data-tutorial-id': 'tutorial-position-badges' } : {})}
                 >
                   {b.position}
                 </span>
                 <span
                   className="text-xs text-purple-300 bg-purple-900/40 px-1 rounded"
-                  data-tutorial-id="tutorial-archetype-badge"
+                  {...(idx === 0 ? { 'data-tutorial-id': 'tutorial-archetype-badge' } : {})}
                 >
                   {b.trait_archetype}
                 </span>
                 <span
                   className="text-xs text-yellow-300 bg-yellow-900/40 px-1 rounded"
-                  data-tutorial-id="tutorial-tier-badge"
+                  {...(idx === 0 ? { 'data-tutorial-id': 'tutorial-tier-badge' } : {})}
                 >
                   T{b.tier}
                 </span>
