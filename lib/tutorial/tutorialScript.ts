@@ -219,13 +219,13 @@ const lesson3Steps: TutorialStep[] = [
     scriptedOffensiveDraw: 'Shoot',
   },
   {
-    id: 'l3-defense-block',
+    id: 'l3-defense-steal',
     lesson: 3,
     stepIndex: 6,
-    dialogue: "Defense plays Block — but your Sniper trait is about to make that irrelevant. Watch what happens at resolution.",
+    dialogue: "Defense plays Steal — bad read! Steal only works against Pass. Your Shoot goes right through it.",
     waitFor: 'auto',
     autoAdvanceMs: 2000,
-    scriptedDefensiveCard: 'Block',
+    scriptedDefensiveCard: 'Steal',
   },
   {
     id: 'l3-resolve-shoot',
