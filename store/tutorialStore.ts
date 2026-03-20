@@ -156,55 +156,24 @@ export const useTutorialStore = create<TutorialStore>()(
     },
 
     handleSpotlightClick: () => {
-      const { currentStepIndex, gameState } = get();
+      const { currentStepIndex } = get();
       const step = TUTORIAL_STEPS[currentStepIndex];
       if (!step || step.waitFor !== 'click-spotlight') return;
 
-      // Handle the action based on step id
-      const { scriptedDrawPending, scriptedDefensePending } = get();
-
-      // RPS click
-      if (step.phase === 'RPS' && gameState) {
-        const newState = performScriptedRPS(gameState);
-        set({ gameState: newState });
-        get().advanceStep();
+      // Delegate to the gated action handlers — they check the current step
+      if (step.phase === 'RPS') {
+        get().submitRPSChoice('rock');
         return;
       }
-
-      // Line change skip
-      if (step.phase === 'POSSESSION_START' && gameState) {
-        const newState = performScriptedSkipBothLineChanges(gameState);
-        set({ gameState: newState });
-        get().advanceStep();
+      if (step.phase === 'POSSESSION_START') {
+        get().skipLineChange();
         return;
       }
-
-      // Offensive draw
-      if (step.phase === 'OFFENSIVE_DRAW' && gameState) {
-        let newState = gameState;
-        if (scriptedDrawPending) {
-          newState = performScriptedOffensiveDraw(gameState, scriptedDrawPending);
-        } else {
-          newState = performOffensiveDraw(gameState);
-        }
-
-        // If there's a scripted defense, auto-apply it
-        if (scriptedDefensePending && newState.phase === 'DEFENSIVE_RESPONSE') {
-          newState = performScriptedDefensiveResponse(newState, scriptedDefensePending);
-        }
-
-        set({
-          gameState: newState,
-          scriptedDrawPending: null,
-          awaitingAutoDefense: !!scriptedDefensePending,
-        });
-        get().advanceStep();
+      if (step.phase === 'OFFENSIVE_DRAW') {
+        get().drawCard();
         return;
       }
-
-      // Trait window / resolve
-      if (step.phase === 'TRAIT_WINDOW' && gameState) {
-        // Just resolve
+      if (step.phase === 'TRAIT_WINDOW') {
         get().confirmResolution();
         return;
       }
@@ -214,23 +183,33 @@ export const useTutorialStore = create<TutorialStore>()(
     },
 
     submitRPSChoice: (choice) => {
-      const { gameState } = get();
+      const { gameState, currentStepIndex } = get();
       if (!gameState) return;
-      // In tutorial, RPS always results in player1 winning
+      const step = TUTORIAL_STEPS[currentStepIndex];
+      // Only allow RPS when the current step expects it
+      if (!step || step.phase !== 'RPS' || step.waitFor !== 'click-spotlight') return;
       const newState = performScriptedRPS(gameState);
       set({ gameState: newState });
+      get().advanceStep();
     },
 
     skipLineChange: () => {
-      const { gameState } = get();
+      const { gameState, currentStepIndex } = get();
       if (!gameState) return;
+      const step = TUTORIAL_STEPS[currentStepIndex];
+      // Only allow line change skip when the current step expects it
+      if (!step || step.phase !== 'POSSESSION_START' || step.waitFor !== 'click-spotlight') return;
       const newState = performScriptedSkipBothLineChanges(gameState);
       set({ gameState: newState });
+      get().advanceStep();
     },
 
     drawCard: () => {
-      const { gameState, scriptedDrawPending, scriptedDefensePending } = get();
+      const { gameState, scriptedDrawPending, scriptedDefensePending, currentStepIndex } = get();
       if (!gameState || gameState.phase !== 'OFFENSIVE_DRAW') return;
+      const step = TUTORIAL_STEPS[currentStepIndex];
+      // Only allow draw when the current step expects it
+      if (!step || step.phase !== 'OFFENSIVE_DRAW' || step.waitFor !== 'click-spotlight') return;
 
       let newState: GameState;
       if (scriptedDrawPending) {
@@ -248,19 +227,26 @@ export const useTutorialStore = create<TutorialStore>()(
         gameState: newState,
         scriptedDrawPending: null,
       });
+      get().advanceStep();
     },
 
     selectDefensiveCard: (cardId) => {
-      const { gameState } = get();
+      const { gameState, currentStepIndex } = get();
       if (!gameState || gameState.phase !== 'DEFENSIVE_RESPONSE') return;
+      const step = TUTORIAL_STEPS[currentStepIndex];
+      // Only allow defense selection when step expects it
+      if (!step || step.phase !== 'DEFENSIVE_RESPONSE') return;
       const newState = submitDefensiveResponse(gameState, cardId);
       set({ gameState: newState });
     },
 
     confirmResolution: () => {
-      const { gameState } = get();
+      const { gameState, currentStepIndex } = get();
       if (!gameState || gameState.phase !== 'TRAIT_WINDOW') return;
       if (!gameState.drawn_card || !gameState.defensive_selected_card) return;
+      const step = TUTORIAL_STEPS[currentStepIndex];
+      // Only allow resolve when the current step expects it
+      if (!step || step.phase !== 'TRAIT_WINDOW' || step.waitFor !== 'click-spotlight') return;
 
       set({ resolutionAnimating: true });
 
@@ -278,12 +264,17 @@ export const useTutorialStore = create<TutorialStore>()(
           resolutionAnimating: false,
           showResolutionResult: true,
         });
+        get().advanceStep();
       }, 800);
     },
 
     dismissResolution: () => {
-      const { gameState } = get();
+      const { gameState, currentStepIndex } = get();
       if (!gameState) return;
+      const step = TUTORIAL_STEPS[currentStepIndex];
+      // Only dismiss when step expects it (advance type on resolution result)
+      // Allow dismissal if the step spotlights the resolution or is an advance step
+      if (step && step.waitFor === 'click-spotlight' && step.phase !== undefined) return;
 
       // After resolution dismiss, reset to next draw state
       let newState = { ...gameState };

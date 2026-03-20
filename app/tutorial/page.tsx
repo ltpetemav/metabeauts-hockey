@@ -8,7 +8,6 @@ import { ScoreBoard } from '@/components/ui/ScoreBoard';
 import { RinkLayout } from '@/components/game/RinkLayout';
 import { TurnPanel } from '@/components/game/TurnPanel';
 import { ResolutionModal } from '@/components/game/ResolutionModal';
-import { TUTORIAL_STEPS } from '@/lib/tutorial/tutorialScript';
 import { RPSChoice } from '@/types/game';
 
 // ── Tutorial Game Content ─────────────────────────────────────────────────
@@ -17,7 +16,6 @@ import { RPSChoice } from '@/types/game';
 function TutorialGameContent() {
   const {
     gameState,
-    currentStepIndex,
     currentViewingPlayer,
     showResolutionResult,
     submitRPSChoice,
@@ -26,7 +24,7 @@ function TutorialGameContent() {
     selectDefensiveCard,
     confirmResolution,
     dismissResolution,
-    handleSpotlightClick,
+
   } = useTutorialStore();
 
   const router = useRouter();
@@ -39,39 +37,22 @@ function TutorialGameContent() {
     );
   }
 
-  const currentStep = TUTORIAL_STEPS[currentStepIndex];
-
-  // Wrap TurnPanel actions with tutorial awareness
-  const handleRPSSubmit = (player: 'player1' | 'player2', choice: RPSChoice) => {
-    if (currentStep?.spotlight === 'tutorial-rps-area' && currentStep?.waitFor === 'click-spotlight') {
-      handleSpotlightClick();
-    } else {
-      submitRPSChoice(choice);
-    }
+  // All game actions are gated by the tutorial store — they only execute
+  // when the current step expects them. No need for extra checks here.
+  const handleRPSSubmit = (_player: 'player1' | 'player2', choice: RPSChoice) => {
+    submitRPSChoice(choice);
   };
 
-  const handleSkipLineChange = (player: 'player1' | 'player2') => {
-    if (currentStep?.spotlight === 'tutorial-turn-panel' && currentStep?.waitFor === 'click-spotlight') {
-      handleSpotlightClick();
-    } else {
-      skipLineChange();
-    }
+  const handleSkipLineChange = (_player: 'player1' | 'player2') => {
+    skipLineChange();
   };
 
   const handleDrawCard = () => {
-    if (currentStep?.spotlight === 'tutorial-draw-btn' && currentStep?.waitFor === 'click-spotlight') {
-      handleSpotlightClick();
-    } else {
-      drawCard();
-    }
+    drawCard();
   };
 
   const handleConfirmResolution = () => {
-    if (currentStep?.spotlight === 'tutorial-resolve-btn' && currentStep?.waitFor === 'click-spotlight') {
-      handleSpotlightClick();
-    } else {
-      confirmResolution();
-    }
+    confirmResolution();
   };
 
   return (
