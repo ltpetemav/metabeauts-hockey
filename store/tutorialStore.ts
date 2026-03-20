@@ -251,13 +251,19 @@ export const useTutorialStore = create<TutorialStore>()(
       set({ resolutionAnimating: true });
 
       setTimeout(() => {
-        const resolved = executeResolution(gameState);
+        // Re-read latest state for resolution (avoids stale closure issues)
+        const latestState = get().gameState;
+        const stateToResolve = latestState || gameState;
+        const resolved = executeResolution(stateToResolve);
 
         // Apply catch-up if needed
         let finalState = resolved;
         if (finalState.catch_up_traits_pending) {
           finalState = applyCatchUpTraits(finalState, finalState.catch_up_traits_pending.player_id);
         }
+
+        // Debug: log can_shoot for tutorial tracing
+        console.log('[Tutorial] Resolution:', stateToResolve.drawn_card?.card_type, 'vs', stateToResolve.defensive_selected_card?.card_type, '→ can_shoot:', finalState.can_shoot, 'outcome:', resolved.last_resolution?.outcome);
 
         set({
           gameState: finalState,
@@ -275,10 +281,12 @@ export const useTutorialStore = create<TutorialStore>()(
 
       // Always allow dismissing the resolution modal — it blocks the tutorial otherwise
       let newState = { ...gameState };
+      console.log('[Tutorial] Dismiss resolution — phase:', newState.phase, 'can_shoot:', newState.can_shoot);
       if (newState.phase === 'POSSESSION_START') {
         // Skip line changes for tutorial
         newState = performScriptedSkipBothLineChanges(newState);
       }
+      console.log('[Tutorial] After line change skip — phase:', newState.phase, 'can_shoot:', newState.can_shoot);
 
       set({
         gameState: newState,
