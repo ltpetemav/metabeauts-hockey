@@ -264,19 +264,16 @@ export const useTutorialStore = create<TutorialStore>()(
           resolutionAnimating: false,
           showResolutionResult: true,
         });
-        get().advanceStep();
+        // Don't advance here — let dismissResolution advance the step
+        // so the player can see the result before moving on
       }, 800);
     },
 
     dismissResolution: () => {
-      const { gameState, currentStepIndex } = get();
+      const { gameState } = get();
       if (!gameState) return;
-      const step = TUTORIAL_STEPS[currentStepIndex];
-      // Only dismiss when step expects it (advance type on resolution result)
-      // Allow dismissal if the step spotlights the resolution or is an advance step
-      if (step && step.waitFor === 'click-spotlight' && step.phase !== undefined) return;
 
-      // After resolution dismiss, reset to next draw state
+      // Always allow dismissing the resolution modal — it blocks the tutorial otherwise
       let newState = { ...gameState };
       if (newState.phase === 'POSSESSION_START') {
         // Skip line changes for tutorial
@@ -287,6 +284,9 @@ export const useTutorialStore = create<TutorialStore>()(
         gameState: newState,
         showResolutionResult: false,
       });
+
+      // Advance the tutorial step after the player sees the result
+      get().advanceStep();
     },
 
     resetTutorial: () => {

@@ -157,7 +157,6 @@ const lesson2Steps: TutorialStep[] = [
     lesson: 2,
     stepIndex: 9,
     dialogue: "Pass vs Block = Tie. You still have the puck! Now you get to draw again. Each draw costs a card from your Beaut's pile. Empty pile = exhausted Beaut.",
-    spotlight: 'tutorial-resolution-result',
     waitFor: 'advance',
   },
 ];
@@ -184,13 +183,13 @@ const lesson3Steps: TutorialStep[] = [
     scriptedOffensiveDraw: 'Pass',
   },
   {
-    id: 'l3-defense-steal-loses',
+    id: 'l3-defense-check-loses',
     lesson: 3,
     stepIndex: 2,
-    dialogue: "Defense plays Steal vs your Pass — and Steal LOSES to Pass! You win the possession, and canShoot just flipped ON. See it light up?",
+    dialogue: "Defense plays Check vs your Pass — but Check only stops Skate! Your Pass goes through untouched. canShoot just flipped ON!",
     waitFor: 'auto',
     autoAdvanceMs: 2000,
-    scriptedDefensiveCard: 'Steal',
+    scriptedDefensiveCard: 'Check',
   },
   {
     id: 'l3-resolve-pass',
