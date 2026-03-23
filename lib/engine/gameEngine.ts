@@ -1,7 +1,6 @@
 /**
  * Game Engine — single source of truth for all state transitions.
- * Server-authoritative even in local 2-player mode.
- * All random draws happen here, not in UI.
+ * New rules: Action Deck cycling, blind defense, shoot turnover, all 14 traits.
  */
 
 import {
@@ -10,7 +9,6 @@ import {
   BeautEntity,
   PlayerRoster,
   ActionCard,
-  TraitCard,
   CardType,
   TraitName,
   RPSChoice,
@@ -20,16 +18,18 @@ import {
   Tier,
 } from '@/types/game';
 import {
-  buildActionPile,
+  setupActionDeck,
   drawFromPile,
   availableCards,
-  createTraitCard,
   shuffleArray,
-  isNaturalTrait,
   createActionCard,
+  returnCardToDeck,
+  drawFromDeck,
   POSITION_LEGAL_CARDS,
+  BACKUP_ACTION,
+  MAX_CARDS_PER_BEAUT,
 } from './cards';
-import { resolveAction, updateCanShoot, ResolutionInput } from './resolution';
+import { resolveAction, updateCanShoot, ResolutionInput, getEffectiveCardType } from './resolution';
 import { v4 as uuidv4 } from 'uuid';
 
 // RPS resolution
@@ -64,49 +64,27 @@ export function buildBeautEntity(metadata: {
     trait_archetype: metadata.trait_archetype,
     image_url: metadata.image_url,
     team: metadata.team,
-    action_pile: [], // set when ice/bench assigned
-    trait_card: null,
+    action_pile: [],
     is_exhausted: false,
-    can_shoot: false,
   };
 }
 
-// Initialize roster with action piles
+// Initialize roster with Action Deck system
 function initRoster(
   beauts: BeautEntity[],
   onIceIds: string[],
   onBenchIds: string[],
-  mode: GameMode
-): PlayerRoster & { beauts: BeautEntity[] } {
-  const initedBeauts = beauts.map(b => {
-    const isOnIce = onIceIds.includes(b.id);
-    const trait = b.trait_archetype as TraitName;
-    const pile = buildActionPile(b.position, isOnIce, trait);
-
-    // Assign trait card
-    let traitCard: TraitCard | null = null;
-    if (trait && mode === 'RegularSeason') {
-      const isNatural = isNaturalTrait(trait);
-      if (!isNatural) {
-        // Forced traits are held separately (not in pile)
-        traitCard = createTraitCard(trait as TraitName, 'setup');
-      }
-      // Natural traits are already in the pile (added by buildActionPile)
-    }
-
-    return {
-      ...b,
-      action_pile: pile,
-      trait_card: traitCard,
-      is_exhausted: false,
-    };
-  });
+  _mode: GameMode
+): PlayerRoster {
+  const { updatedBeauts, actionDeck, reservedTraits } = setupActionDeck(beauts, onIceIds, onBenchIds);
 
   return {
     player_id: 'player1', // overridden by caller
-    beauts: initedBeauts,
+    beauts: updatedBeauts,
     on_ice: onIceIds,
     on_bench: onBenchIds,
+    action_deck: actionDeck,
+    reserved_traits: reservedTraits,
   };
 }
 
@@ -118,7 +96,6 @@ export function createGameState(
 ): GameState {
   const id = uuidv4();
 
-  // Default: first 3 are on ice, last 3 on bench
   const p1OnIce = p1Beauts.slice(0, 3).map(b => b.id);
   const p1OnBench = p1Beauts.slice(3).map(b => b.id);
   const p2OnIce = p2Beauts.slice(0, 3).map(b => b.id);
@@ -143,20 +120,18 @@ export function createGameState(
     rps_choice_p2: null,
     rps_winner: null,
     drawn_card: null,
-    drawn_card_is_natural_trait: false,
     defensive_selected_card: null,
-    pending_offensive_trait: null,
-    pending_defensive_trait: null,
     last_resolution: null,
     winner: null,
     turn_number: 0,
     acting_player: null,
-    catch_up_traits_pending: null,
-    natural_trait_activation_pending: false,
-    natural_trait_beaut_id: null,
     offensive_line_change_done: false,
     defensive_line_change_done: false,
-    defensive_archetype_revealed: false,
+    line_change_used_this_possession: { player1: false, player2: false },
+    hybrid_choice_pending: null,
+    immediate_redraw_pending: false,
+    forced_line_change_pending: null,
+    catch_up_traits_pending: null,
     two_timer_secondary_pending: false,
     two_timer_primary_result: null,
   };
@@ -190,6 +165,14 @@ export function updateBeaut(state: GameState, beaut: BeautEntity): GameState {
   return { ...state, player2: updateRoster(state.player2) };
 }
 
+// Update a player's roster
+function updateRoster(state: GameState, player: 'player1' | 'player2', roster: PlayerRoster): GameState {
+  if (player === 'player1') {
+    return { ...state, player1: roster };
+  }
+  return { ...state, player2: roster };
+}
+
 // Submit RPS choice
 export function submitRPS(
   state: GameState,
@@ -202,24 +185,19 @@ export function submitRPS(
     rps_choice_p2: player === 'player2' ? choice : state.rps_choice_p2,
   };
 
-  // Both have chosen — resolve
   if (newState.rps_choice_p1 && newState.rps_choice_p2) {
     const result = resolveRPS(newState.rps_choice_p1, newState.rps_choice_p2);
 
     if (result === 'tie') {
-      // Reset for another round
       return { ...newState, rps_choice_p1: null, rps_choice_p2: null };
     }
 
-    // Winner gets to choose — for simplicity, winner gets possession
     newState = {
       ...newState,
       rps_winner: result,
-      possession: result, // winner starts with puck
+      possession: result,
       phase: 'POSSESSION_START' as GamePhase,
     };
-
-    // Set default active beauts (center for offense, goalie for defense)
     newState = setDefaultActiveBeauts(newState);
   }
 
@@ -230,13 +208,11 @@ function setDefaultActiveBeauts(state: GameState): GameState {
   const offensiveRoster = state.possession === 'player1' ? state.player1 : state.player2;
   const defensiveRoster = state.possession === 'player1' ? state.player2 : state.player1;
 
-  // Offensive: prefer Center on ice, fallback to first on-ice
   const offensiveBeaut =
     offensiveRoster.beauts.find(
       b => b.position === 'Center' && offensiveRoster.on_ice.includes(b.id)
     ) || offensiveRoster.beauts.find(b => offensiveRoster.on_ice.includes(b.id));
 
-  // Defensive: prefer Goaltender on ice, fallback to first on-ice
   const defensiveBeaut =
     defensiveRoster.beauts.find(
       b => b.position === 'Goaltender' && defensiveRoster.on_ice.includes(b.id)
@@ -251,18 +227,18 @@ function setDefaultActiveBeauts(state: GameState): GameState {
   };
 }
 
-// Perform a line change
+// Perform a line change — now supports multi-swap
 export function performLineChange(
   state: GameState,
   player: 'player1' | 'player2',
   swaps: Array<{ ice_beaut_id: string; bench_beaut_id: string; new_card: CardType }>
 ): GameState {
-  let roster = player === 'player1' ? state.player1 : state.player2;
+  let roster = player === 'player1' ? { ...state.player1 } : { ...state.player2 };
 
-  // Apply each swap
   let beauts = [...roster.beauts];
   let onIce = [...roster.on_ice];
   let onBench = [...roster.on_bench];
+  let deck = [...roster.action_deck];
 
   for (const swap of swaps) {
     const iceBeautIdx = beauts.findIndex(b => b.id === swap.ice_beaut_id);
@@ -272,15 +248,22 @@ export function performLineChange(
     const iceBeaut = { ...beauts[iceBeautIdx] };
     const benchBeaut = { ...beauts[benchBeautIdx] };
 
-    // Ice -> Bench: loses all cards, gets 2 fresh cards on bench
-    const freshBenchCards = buildActionPile(iceBeaut.position, false, null);
-    iceBeaut.action_pile = freshBenchCards;
+    // Ice -> Bench: cards return to Action Deck
+    for (const card of iceBeaut.action_pile) {
+      deck = returnCardToDeck(deck, card);
+    }
+    // Bench beaut gets 2 cards from deck
+    const benchDraw = drawFromDeck(deck, 2);
+    iceBeaut.action_pile = benchDraw.drawn;
+    deck = benchDraw.remaining;
     iceBeaut.is_exhausted = false;
 
-    // Bench -> Ice: gains 1 additional card of player's choice
-    const incomingCards = [...benchBeaut.action_pile];
-    const newCard = createActionCard(swap.new_card);
-    benchBeaut.action_pile = shuffleArray([...incomingCards, newCard]);
+    // Bench -> Ice: gets 1 additional card of player's choice
+    // Respect max 3 cards
+    if (benchBeaut.action_pile.length < MAX_CARDS_PER_BEAUT) {
+      const newCard = createActionCard(swap.new_card);
+      benchBeaut.action_pile = shuffleArray([...benchBeaut.action_pile, newCard]);
+    }
     benchBeaut.is_exhausted = benchBeaut.action_pile.length === 0;
 
     // Swap ice/bench
@@ -291,16 +274,11 @@ export function performLineChange(
     beauts[benchBeautIdx] = benchBeaut;
   }
 
-  roster = { ...roster, beauts, on_ice: onIce, on_bench: onBench };
+  roster = { ...roster, beauts, on_ice: onIce, on_bench: onBench, action_deck: deck };
 
-  let newState: GameState;
-  if (player === 'player1') {
-    newState = { ...state, player1: roster };
-  } else {
-    newState = { ...state, player2: roster };
-  }
+  let newState = updateRoster(state, player, roster);
 
-  // Mark line change done
+  // Mark line change done and used this possession
   const offensivePlayer = state.possession;
   const defensivePlayer = offensivePlayer === 'player1' ? 'player2' : 'player1';
 
@@ -310,9 +288,15 @@ export function performLineChange(
     newState = { ...newState, defensive_line_change_done: true };
   }
 
-  // Update active beauts after line change
-  newState = setDefaultActiveBeauts(newState);
+  newState = {
+    ...newState,
+    line_change_used_this_possession: {
+      ...newState.line_change_used_this_possession,
+      [player]: true,
+    },
+  };
 
+  newState = setDefaultActiveBeauts(newState);
   return newState;
 }
 
@@ -329,13 +313,26 @@ export function performOffensiveDraw(state: GameState): GameState {
   const beaut = getBeaut(state, offensiveBeautId);
   if (!beaut) return state;
 
-  const drawResult = drawFromPile(beaut.action_pile);
+  const pile = availableCards(beaut.action_pile);
+  if (pile.length === 0) {
+    // Exhaustion: no cards left — try to reload from Action Deck
+    const offPlayer = state.possession;
+    const roster = offPlayer === 'player1' ? state.player1 : state.player2;
 
-  if (!drawResult) {
-    // Exhaustion: no cards left
+    if (roster.action_deck.length > 0) {
+      // Draw up to 3 from deck
+      const reload = drawFromDeck(roster.action_deck, Math.min(3, roster.action_deck.length));
+      const updatedBeaut = { ...beaut, action_pile: reload.drawn, is_exhausted: false };
+      let newState = updateBeaut(state, updatedBeaut);
+      const updatedRoster = { ...(offPlayer === 'player1' ? newState.player1 : newState.player2), action_deck: reload.remaining };
+      newState = updateRoster(newState, offPlayer, updatedRoster);
+      // Retry draw
+      return performOffensiveDraw(newState);
+    }
+
+    // Truly exhausted — turnover
     const exhaustedBeaut = { ...beaut, is_exhausted: true };
     let newState = updateBeaut(state, exhaustedBeaut);
-    // Possession transfers to defense
     const newPossession = state.possession === 'player1' ? 'player2' : 'player1';
     newState = {
       ...newState,
@@ -348,56 +345,126 @@ export function performOffensiveDraw(state: GameState): GameState {
     return newState;
   }
 
-  // Check for illegal Shoot draw
-  if (drawResult.drawn.card_type === 'Shoot' && !state.can_shoot) {
-    // Natural Trait override: Power Fwd can bypass — but that's activated before draw
-    // Discard the card and re-draw
-    const updatedPile = drawResult.remaining.map(c => c); // card is burned
-    const updatedBeaut = { ...beaut, action_pile: updatedPile };
-    let newState = updateBeaut(state, updatedBeaut);
+  const drawResult = drawFromPile(beaut.action_pile);
+  if (!drawResult) return state;
 
-    // Try again (recursion)
-    if (availableCards(updatedPile).length === 0) {
-      // Exhausted after burn
-      const exhaustedBeaut = { ...updatedBeaut, is_exhausted: true };
-      newState = updateBeaut(newState, exhaustedBeaut);
-      const newPossession = newState.possession === 'player1' ? 'player2' : 'player1';
+  // --- BUTTERFLY HANDLING (offensive) ---
+  if (drawResult.drawn.is_trait && drawResult.drawn.trait_name === 'Butterfly' && state.mode === 'RegularSeason') {
+    return handleButterflyDraw(state, beaut, drawResult.drawn, drawResult.remaining, 'offense');
+  }
+
+  // --- SHOOT PREREQUISITE = TURNOVER ---
+  const effectiveType = drawResult.drawn.is_trait && drawResult.drawn.trait_name
+    ? getEffectiveCardType(drawResult.drawn.trait_name, beaut.position, true, null)
+    : drawResult.drawn.card_type;
+
+  if (effectiveType === 'Shoot' && !state.can_shoot) {
+    // Power Fwd and Sniper bypass the prerequisite
+    const canBypass = drawResult.drawn.is_trait &&
+      (drawResult.drawn.trait_name === 'Power Fwd' || drawResult.drawn.trait_name === 'Sniper');
+    if (!canBypass) {
+      // TURNOVER — puck goes to defense immediately
+      const updatedBeaut = { ...beaut, action_pile: drawResult.remaining };
+      let newState = updateBeaut(state, updatedBeaut);
+
+      // Return the drawn card to Action Deck
+      const offPlayer = state.possession;
+      const roster = offPlayer === 'player1' ? newState.player1 : newState.player2;
+      const updatedRoster = { ...roster, action_deck: returnCardToDeck(roster.action_deck, drawResult.drawn) };
+      newState = updateRoster(newState, offPlayer, updatedRoster);
+
+      const newPossession = state.possession === 'player1' ? 'player2' : 'player1';
       newState = {
         ...newState,
         possession: newPossession,
         can_shoot: false,
         phase: 'POSSESSION_START',
+        turn_number: state.turn_number + 1,
+        drawn_card: drawResult.drawn,
+        last_resolution: {
+          outcome: 'TURNOVER',
+          offensive_card: drawResult.drawn.card_type,
+          defensive_card: 'Trait',
+          goal_scored: false,
+          puck_goes_to: 'defense',
+          offensive_beaut_id: beaut.id,
+          defensive_beaut_id: state.active_defensive_beaut_id || '',
+          cards_discarded_from_offense: 0,
+          cards_discarded_from_defense: 0,
+          special_effects: [{ type: 'SHOOT_PREREQUISITE_FAIL' }],
+          exhausted_beauts: [],
+          offensive_card_returns_to_deck: true,
+          defensive_card_returns_to_deck: true,
+          immediate_redraw: false,
+          immediate_redraw_side: null,
+        },
       };
       newState = setDefaultActiveBeauts(newState);
       return newState;
     }
-
-    return performOffensiveDraw(newState);
   }
 
-  // Check for Natural Trait draw
-  const isNaturalTraitDrawn =
-    drawResult.drawn.card_type === 'Trait' &&
-    drawResult.drawn.trait_type === 'Natural' &&
-    state.mode === 'RegularSeason';
+  // --- HYBRID TRAIT: needs player choice ---
+  if (drawResult.drawn.is_trait && drawResult.drawn.trait_name === 'Hybrid' && state.mode === 'RegularSeason') {
+    const updatedBeaut = { ...beaut, action_pile: drawResult.remaining };
+    let newState = updateBeaut(state, updatedBeaut);
+    return {
+      ...newState,
+      drawn_card: drawResult.drawn,
+      phase: 'HYBRID_CHOICE',
+      hybrid_choice_pending: {
+        player: state.possession,
+        options: ['Skate', 'Pass'],
+      },
+    };
+  }
 
-  // Update beaut's pile
+  // Normal draw
   const updatedBeaut = { ...beaut, action_pile: drawResult.remaining };
   let newState = updateBeaut(state, updatedBeaut);
 
   newState = {
     ...newState,
     drawn_card: drawResult.drawn,
-    drawn_card_is_natural_trait: isNaturalTraitDrawn,
-    natural_trait_activation_pending: isNaturalTraitDrawn,
-    natural_trait_beaut_id: isNaturalTraitDrawn ? offensiveBeautId : null,
-    phase: isNaturalTraitDrawn ? 'TRAIT_WINDOW' : 'DEFENSIVE_RESPONSE',
+    phase: 'DEFENSIVE_RESPONSE',
   };
 
   return newState;
 }
 
-// Defense selects a card
+// Handle Butterfly redraw mechanic
+function handleButterflyDraw(
+  state: GameState,
+  beaut: BeautEntity,
+  butterflyCard: ActionCard,
+  remainingPile: ActionCard[],
+  _side: 'offense' | 'defense'
+): GameState {
+  const offPlayer = state.possession;
+  let roster = offPlayer === 'player1' ? { ...state.player1 } : { ...state.player2 };
+
+  if (remainingPile.length === 0) {
+    // Last card: add 3 from Action Deck, put Butterfly back, redraw
+    const refill = drawFromDeck(roster.action_deck, Math.min(3, roster.action_deck.length));
+    const newPile = shuffleArray([butterflyCard, ...refill.drawn]);
+    roster = { ...roster, action_deck: refill.remaining };
+
+    const updatedBeaut = { ...beaut, action_pile: newPile, is_exhausted: false };
+    let newState = updateRoster(state, offPlayer, roster);
+    newState = updateBeaut(newState, updatedBeaut);
+    // Redraw
+    return performOffensiveDraw(newState);
+  } else {
+    // Not last card: put Butterfly back, redraw
+    const newPile = shuffleArray([butterflyCard, ...remainingPile]);
+    const updatedBeaut = { ...beaut, action_pile: newPile };
+    let newState = updateBeaut(state, updatedBeaut);
+    // Redraw (recursive — Butterfly goes back, draw again)
+    return performOffensiveDraw(newState);
+  }
+}
+
+// Defense selects a card (BLIND — they don't see offense's card)
 export function submitDefensiveResponse(
   state: GameState,
   selectedCardId: string
@@ -408,35 +475,76 @@ export function submitDefensiveResponse(
   const beaut = getBeaut(state, defensiveBeautId);
   if (!beaut) return state;
 
-  const selectedCard = beaut.action_pile.find(c => c.id === selectedCardId && c.state === 'in_pile');
+  const selectedCard = beaut.action_pile.find(c => c.id === selectedCardId);
   if (!selectedCard) return state;
+
+  // --- BUTTERFLY on defense: redraw ---
+  if (selectedCard.is_trait && selectedCard.trait_name === 'Butterfly' && state.mode === 'RegularSeason') {
+    const remainingPile = beaut.action_pile.filter(c => c.id !== selectedCardId);
+    const defPlayer = state.possession === 'player1' ? 'player2' : 'player1';
+    let roster = defPlayer === 'player1' ? { ...state.player1 } : { ...state.player2 };
+
+    if (remainingPile.length === 0) {
+      // Last card: refill 3 from deck
+      const refill = drawFromDeck(roster.action_deck, Math.min(3, roster.action_deck.length));
+      const newPile = shuffleArray([selectedCard, ...refill.drawn]);
+      roster = { ...roster, action_deck: refill.remaining };
+
+      const updatedBeaut = { ...beaut, action_pile: newPile, is_exhausted: false };
+      let newState = updateRoster(state, defPlayer, roster);
+      newState = updateBeaut(newState, updatedBeaut);
+      // Stay in DEFENSIVE_RESPONSE for re-pick
+      return newState;
+    } else {
+      // Put Butterfly back, defense picks again
+      const newPile = shuffleArray([selectedCard, ...remainingPile]);
+      const updatedBeaut = { ...beaut, action_pile: newPile };
+      const newState = updateBeaut(state, updatedBeaut);
+      return newState; // Stay in DEFENSIVE_RESPONSE
+    }
+  }
+
+  // --- HYBRID on defense: needs choice ---
+  if (selectedCard.is_trait && selectedCard.trait_name === 'Hybrid' && state.mode === 'RegularSeason') {
+    const defPlayer = state.possession === 'player1' ? 'player2' : 'player1';
+    return {
+      ...state,
+      defensive_selected_card: selectedCard,
+      phase: 'HYBRID_CHOICE',
+      hybrid_choice_pending: {
+        player: defPlayer,
+        options: ['Block', 'Check'],
+      },
+    };
+  }
 
   return {
     ...state,
     defensive_selected_card: selectedCard,
-    phase: 'TRAIT_WINDOW',
+    phase: 'SIMULTANEOUS_REVEAL',
   };
 }
 
-// Activate forced trait (offensive or defensive)
-export function activateForcedTrait(
-  state: GameState,
-  player: 'player1' | 'player2',
-  traitName: TraitName | null
-): GameState {
-  if (!traitName) {
-    // No trait activated
-    if (player === state.possession) {
-      return { ...state, pending_offensive_trait: null };
-    } else {
-      return { ...state, pending_defensive_trait: null };
-    }
-  }
+// Resolve a Hybrid choice
+export function resolveHybridChoice(state: GameState, chosenType: CardType): GameState {
+  if (!state.hybrid_choice_pending) return state;
 
-  if (player === state.possession) {
-    return { ...state, pending_offensive_trait: traitName };
+  const isOffense = state.hybrid_choice_pending.player === state.possession;
+
+  const newState = {
+    ...state,
+    hybrid_choice_pending: {
+      ...state.hybrid_choice_pending,
+      resolved_card_type: chosenType,
+    },
+  };
+
+  if (isOffense) {
+    // Offense chose — now go to DEFENSIVE_RESPONSE
+    return { ...newState, phase: 'DEFENSIVE_RESPONSE' };
   } else {
-    return { ...state, pending_defensive_trait: traitName };
+    // Defense chose — both cards ready, go to SIMULTANEOUS_REVEAL
+    return { ...newState, phase: 'SIMULTANEOUS_REVEAL' };
   }
 }
 
@@ -449,6 +557,19 @@ export function executeResolution(state: GameState): GameState {
   const defensiveBeaut = getBeaut(state, state.active_defensive_beaut_id);
   if (!offensiveBeaut || !defensiveBeaut) return state;
 
+  // Determine trait names
+  const offTraitName = state.drawn_card.is_trait ? (state.drawn_card.trait_name || null) : null;
+  const defTraitName = state.defensive_selected_card.is_trait ? (state.defensive_selected_card.trait_name || null) : null;
+
+  // Get hybrid choices if any
+  const hcp = state.hybrid_choice_pending;
+  const hybridOffChoice = hcp && hcp.player === state.possession
+    ? (hcp.resolved_card_type || null)
+    : null;
+  const hybridDefChoice = hcp && hcp.player !== state.possession
+    ? (hcp.resolved_card_type || null)
+    : null;
+
   const input: ResolutionInput = {
     offensiveCard: state.drawn_card.card_type,
     defensiveCard: state.defensive_selected_card.card_type,
@@ -456,33 +577,56 @@ export function executeResolution(state: GameState): GameState {
     defensiveBeaut,
     canShoot: state.can_shoot,
     mode: state.mode,
-    activeOffensiveTrait: state.pending_offensive_trait,
-    activeDefensiveTrait: state.pending_defensive_trait,
+    offensiveTraitName: offTraitName,
+    defensiveTraitName: defTraitName,
+    hybridOffenseChoice: hybridOffChoice,
+    hybridDefenseChoice: hybridDefChoice,
   };
 
   const result = resolveAction(input);
 
-  // Remove defensive card from pile (it was played/selected)
+  // =====================================================
+  // CARD CYCLING: return played cards to Action Deck
+  // =====================================================
+  const offPlayer = state.possession;
+  const defPlayer = offPlayer === 'player1' ? 'player2' : 'player1';
+  let offRoster = offPlayer === 'player1' ? { ...state.player1 } : { ...state.player2 };
+  let defRoster = defPlayer === 'player1' ? { ...state.player1 } : { ...state.player2 };
+
+  // Remove defensive card from its pile
   let updatedDefBeaut = {
     ...defensiveBeaut,
-    action_pile: defensiveBeaut.action_pile.filter(
-      c => c.id !== state.defensive_selected_card!.id
-    ),
+    action_pile: defensiveBeaut.action_pile.filter(c => c.id !== state.defensive_selected_card!.id),
   };
-
-  // Apply special card-discard effects
   let updatedOffBeaut = { ...offensiveBeaut };
 
-  // Discard cards from offense
+  // Return offensive card to deck (if applicable)
+  if (result.offensive_card_returns_to_deck) {
+    offRoster = { ...offRoster, action_deck: returnCardToDeck(offRoster.action_deck, state.drawn_card) };
+  }
+  // else: trait was triggered, card is permanently discarded (removed from game)
+
+  // Return defensive card to deck (if applicable)
+  if (result.defensive_card_returns_to_deck) {
+    defRoster = { ...defRoster, action_deck: returnCardToDeck(defRoster.action_deck, state.defensive_selected_card) };
+  }
+
+  // =====================================================
+  // APPLY DISCARD EFFECTS
+  // =====================================================
+
+  // Discard cards from offense (Dangler/Enforcer/Grinder effects)
   if (result.cards_discarded_from_offense > 0) {
     const available = availableCards(updatedOffBeaut.action_pile);
-    const toDiscard = result.cards_discarded_from_offense === 999
-      ? available.length
-      : Math.min(result.cards_discarded_from_offense, available.length);
-    // Remove first N cards randomly
+    const toDiscard = Math.min(result.cards_discarded_from_offense, available.length);
     const shuffled = shuffleArray(available);
-    const discardIds = new Set(shuffled.slice(0, toDiscard).map(c => c.id));
-    updatedOffBeaut.action_pile = updatedOffBeaut.action_pile.filter(c => !discardIds.has(c.id));
+    const discarded = shuffled.slice(0, toDiscard);
+    const kept = shuffled.slice(toDiscard);
+    updatedOffBeaut = { ...updatedOffBeaut, action_pile: kept };
+    // Discarded cards go back to the player's Action Deck
+    for (const card of discarded) {
+      offRoster = { ...offRoster, action_deck: returnCardToDeck(offRoster.action_deck, card) };
+    }
   }
 
   // Discard cards from defense
@@ -490,37 +634,89 @@ export function executeResolution(state: GameState): GameState {
     const available = availableCards(updatedDefBeaut.action_pile);
     const toDiscard = Math.min(result.cards_discarded_from_defense, available.length);
     const shuffled = shuffleArray(available);
-    const discardIds = new Set(shuffled.slice(0, toDiscard).map(c => c.id));
-    updatedDefBeaut.action_pile = updatedDefBeaut.action_pile.filter(c => !discardIds.has(c.id));
+    const discarded = shuffled.slice(0, toDiscard);
+    const kept = shuffled.slice(toDiscard);
+    updatedDefBeaut = { ...updatedDefBeaut, action_pile: kept };
+    for (const card of discarded) {
+      defRoster = { ...defRoster, action_deck: returnCardToDeck(defRoster.action_deck, card) };
+    }
   }
 
-  // Butterfly: if Butterfly trait was activated and it was a catch, return to pile
-  const butterflyEffect = result.special_effects.find(e => e.type === 'BUTTERFLY_RETURN');
-  if (butterflyEffect) {
-    // Butterfly card returns to pile — it was the defensive selected card
-    const butterflyCard = { ...state.defensive_selected_card, state: 'in_pile' as const };
-    updatedDefBeaut.action_pile = [...updatedDefBeaut.action_pile, butterflyCard];
+  // Grinder: discard a TRAIT card specifically from defense
+  const grinderTraitEffect = result.special_effects.find(e => e.type === 'GRINDER_DISCARD_TRAIT');
+  if (grinderTraitEffect) {
+    const traitIdx = updatedDefBeaut.action_pile.findIndex(c => c.is_trait);
+    if (traitIdx !== -1) {
+      const traitCard = updatedDefBeaut.action_pile[traitIdx];
+      updatedDefBeaut = {
+        ...updatedDefBeaut,
+        action_pile: updatedDefBeaut.action_pile.filter((_, i) => i !== traitIdx),
+      };
+      // Trait removed by opponent → returns to Action Deck (not permanently discarded)
+      defRoster = { ...defRoster, action_deck: returnCardToDeck(defRoster.action_deck, traitCard) };
+    }
   }
 
   // Check exhaustion
   updatedOffBeaut.is_exhausted = availableCards(updatedOffBeaut.action_pile).length === 0;
   updatedDefBeaut.is_exhausted = availableCards(updatedDefBeaut.action_pile).length === 0;
 
-  let newState = updateBeaut(state, updatedOffBeaut);
-  newState = updateBeaut(newState, updatedDefBeaut);
+  // Update rosters with modified beauts
+  offRoster = {
+    ...offRoster,
+    beauts: offRoster.beauts.map(b => b.id === updatedOffBeaut.id ? updatedOffBeaut : b),
+  };
+  defRoster = {
+    ...defRoster,
+    beauts: defRoster.beauts.map(b => b.id === updatedDefBeaut.id ? updatedDefBeaut : b),
+  };
 
-  // Update canShoot
-  const newCanShoot = updateCanShoot(state.can_shoot, state.drawn_card.card_type, result.outcome);
+  let newState: GameState;
+  if (offPlayer === 'player1') {
+    newState = { ...state, player1: offRoster, player2: defRoster };
+  } else {
+    newState = { ...state, player1: defRoster, player2: offRoster };
+  }
 
-  // Handle possession change
+  // =====================================================
+  // UPDATE CAN_SHOOT
+  // =====================================================
+  const effectiveOffCard = result.offensive_card;
+  const newCanShoot = updateCanShoot(state.can_shoot, effectiveOffCard, result.outcome);
+
+  // =====================================================
+  // HANDLE POSSESSION CHANGE
+  // =====================================================
   let newPossession = state.possession;
   if (result.puck_goes_to === 'defense') {
     newPossession = state.possession === 'player1' ? 'player2' : 'player1';
   }
-  // If puck_goes_to is 'offense' (e.g., Block), possession stays but canShoot resets
-  // (already handled by updateCanShoot returning false for Shoot)
 
-  // Handle goal scored
+  // Handle Pass: switch active offensive beaut
+  let newOffensiveBeautId = newState.active_offensive_beaut_id;
+  let newDefensiveBeautId = newState.active_defensive_beaut_id;
+
+  if (effectiveOffCard === 'Pass' && result.outcome === 'OFFENSE_WINS') {
+    const currentOffRoster = newPossession === 'player1' ? newState.player1 : newState.player2;
+    const otherOnIce = currentOffRoster.on_ice.filter(id => id !== state.active_offensive_beaut_id);
+    if (otherOnIce.length > 0) {
+      newOffensiveBeautId = otherOnIce[0];
+    }
+  }
+
+  // Offensive archetype: switch puck holder
+  const offSwitchEffect = result.special_effects.find(e => e.type === 'OFFENSIVE_SWITCH_PUCK');
+  if (offSwitchEffect) {
+    const currentOffRoster = state.possession === 'player1' ? newState.player1 : newState.player2;
+    const otherOnIce = currentOffRoster.on_ice.filter(id => id !== state.active_offensive_beaut_id);
+    if (otherOnIce.length > 0) {
+      newOffensiveBeautId = otherOnIce[0];
+    }
+  }
+
+  // =====================================================
+  // HANDLE GOAL
+  // =====================================================
   let p1Score = newState.player1_score;
   let p2Score = newState.player2_score;
   let winner: 'player1' | 'player2' | null = null;
@@ -528,100 +724,95 @@ export function executeResolution(state: GameState): GameState {
 
   if (result.goal_scored) {
     const scorer = state.possession;
-    if (scorer === 'player1') {
-      p1Score++;
-    } else {
-      p2Score++;
-    }
+    if (scorer === 'player1') p1Score++;
+    else p2Score++;
 
-    // Check win condition
-    if (p1Score >= 3) {
-      winner = 'player1';
-    } else if (p2Score >= 3) {
-      winner = 'player2';
-    }
+    if (p1Score >= 3) winner = 'player1';
+    else if (p2Score >= 3) winner = 'player2';
 
-    // Catch-up mechanic: trailing player gets 2 trait cards
+    // Post-goal possession: trailing player gets puck
     if (!winner) {
-      const trailingPlayer =
-        scorer === 'player1'
-          ? 'player2'
-          : 'player1';
-      catchUpPending = { player_id: trailingPlayer, count: 2 };
-    }
-
-    // After goal: possession goes to the team that was scored on
-    newPossession = state.possession === 'player1' ? 'player2' : 'player1';
-  }
-
-  // Handle Pass: active beaut changes (switch active beaut to another on-ice)
-  let newOffensiveBeautId = newState.active_offensive_beaut_id;
-  let newDefensiveBeautId = newState.active_defensive_beaut_id;
-
-  if (state.drawn_card.card_type === 'Pass' && result.outcome === 'OFFENSE_WINS') {
-    // Switch active offensive beaut to another on-ice Beaut
-    const offRoster = state.possession === 'player1' ? newState.player1 : newState.player2;
-    const otherOnIce = offRoster.on_ice.filter(id => id !== state.active_offensive_beaut_id);
-    if (otherOnIce.length > 0) {
-      newOffensiveBeautId = otherOnIce[0]; // Pick first other on-ice beaut
-    }
-  }
-
-  // Playmaker bonus card: add 1 card to receiving beaut
-  const playmakerEffect = result.special_effects.find(e => e.type === 'PLAYMAKER_BONUS_CARD');
-  if (playmakerEffect && newOffensiveBeautId) {
-    const receivingBeaut = getBeaut(newState, newOffensiveBeautId);
-    if (receivingBeaut) {
-      const bonusCard = createActionCard(
-        POSITION_LEGAL_CARDS[receivingBeaut.position][0] as CardType
-      );
-      const updated = {
-        ...receivingBeaut,
-        action_pile: [...receivingBeaut.action_pile, bonusCard],
-        is_exhausted: false,
-      };
-      newState = updateBeaut(newState, updated);
-    }
-  }
-
-  // Power Fwd (defensive): eject offensive beaut to bench
-  const powerFwdEject = result.special_effects.find(e => e.type === 'POWER_FWD_EJECT');
-  if (powerFwdEject && state.active_offensive_beaut_id) {
-    // Move offensive beaut to bench, replace with a bench beaut
-    const offRoster = state.possession === 'player1' ? newState.player1 : newState.player2;
-    const ejectedId = state.active_offensive_beaut_id;
-    const newOnIce = offRoster.on_ice.filter(id => id !== ejectedId);
-    const newOnBench = [...offRoster.on_bench, ejectedId];
-
-    // Move first bench beaut to ice
-    if (offRoster.on_bench.length > 0) {
-      const incoming = offRoster.on_bench[0];
-      newOnIce.push(incoming);
-      const finalBench = newOnBench.filter(id => id !== incoming);
-      const updatedOffRoster = { ...offRoster, on_ice: newOnIce, on_bench: finalBench };
-      if (state.possession === 'player1') {
-        newState = { ...newState, player1: updatedOffRoster };
+      if (p1Score > p2Score) {
+        newPossession = 'player2'; // Trailing player
+      } else if (p2Score > p1Score) {
+        newPossession = 'player1'; // Trailing player
       } else {
-        newState = { ...newState, player2: updatedOffRoster };
+        // Tied: scored-upon team gets puck
+        newPossession = scorer === 'player1' ? 'player2' : 'player1';
+      }
+
+      // Catch-up: 2 reserved trait cards added to Action Deck for scored-upon player
+      const scoredUpon = scorer === 'player1' ? 'player2' : 'player1';
+      const scoredUponRoster = scoredUpon === 'player1' ? newState.player1 : newState.player2;
+      if (scoredUponRoster.reserved_traits.length > 0) {
+        catchUpPending = { player_id: scoredUpon, count: 2 };
       }
     }
-
-    newOffensiveBeautId = newOnIce[0] || null;
   }
 
-  // Two-Timer: if primary would have been stopped, mark secondary draw needed
+  // =====================================================
+  // HANDLE TWO-TIMER SECONDARY DRAW
+  // =====================================================
   let twoTimerPending = false;
-  if (state.mode === 'RegularSeason' && state.pending_offensive_trait === 'Two-Timer') {
-    if (result.outcome === 'DEFENSE_WINS') {
-      twoTimerPending = true;
+  if (state.mode === 'RegularSeason' && offTraitName === 'Two-Timer' && result.outcome === 'DEFENSE_WINS') {
+    twoTimerPending = true;
+  }
+
+  // =====================================================
+  // HANDLE IMMEDIATE REDRAW
+  // =====================================================
+  let immediateRedraw = result.immediate_redraw;
+  if (result.immediate_redraw_side === 'defense' && result.outcome === 'DEFENSE_WINS') {
+    // Defense gets puck and immediate redraw — possession already changed
+    immediateRedraw = true;
+  }
+
+  // =====================================================
+  // HANDLE ENFORCER FORCE LINE CHANGE
+  // =====================================================
+  let forcedLineChange: 'player1' | 'player2' | null = null;
+  const enforcerEffect = result.special_effects.find(e => e.type === 'ENFORCER_FORCE_LINE_CHANGE');
+  if (enforcerEffect) {
+    forcedLineChange = defPlayer;
+    // Check if opponent CAN do a line change
+    const opponentRoster = defPlayer === 'player1' ? newState.player1 : newState.player2;
+    if (opponentRoster.on_bench.length === 0) {
+      // Can't line change → each opposing on-ice Beaut discards an Action Card
+      let updatedOpponentRoster = { ...opponentRoster };
+      const updatedOpponentBeauts = updatedOpponentRoster.beauts.map(b => {
+        if (updatedOpponentRoster.on_ice.includes(b.id) && b.action_pile.length > 0) {
+          const shuffled = shuffleArray(b.action_pile);
+          const discarded = shuffled[0];
+          updatedOpponentRoster = {
+            ...updatedOpponentRoster,
+            action_deck: returnCardToDeck(updatedOpponentRoster.action_deck, discarded),
+          };
+          return { ...b, action_pile: shuffled.slice(1) };
+        }
+        return b;
+      });
+      updatedOpponentRoster = { ...updatedOpponentRoster, beauts: updatedOpponentBeauts };
+      newState = updateRoster(newState, defPlayer, updatedOpponentRoster);
+      forcedLineChange = null; // No line change needed anymore
+      result.special_effects.push({ type: 'ENFORCER_CANT_LINE_CHANGE_DISCARD' });
     }
   }
 
-  const nextPhase: GamePhase = winner
-    ? 'MATCH_END'
-    : twoTimerPending
-    ? 'OFFENSIVE_DRAW' // re-draw secondary
-    : 'POSSESSION_START';
+  // =====================================================
+  // DETERMINE NEXT PHASE
+  // =====================================================
+  let nextPhase: GamePhase;
+  if (winner) {
+    nextPhase = 'MATCH_END';
+  } else if (forcedLineChange) {
+    nextPhase = 'FORCED_LINE_CHANGE';
+  } else if (twoTimerPending) {
+    nextPhase = 'OFFENSIVE_DRAW'; // Two-Timer secondary draw
+  } else if (immediateRedraw) {
+    nextPhase = 'OFFENSIVE_DRAW'; // Immediate redraw
+  } else {
+    nextPhase = 'POSSESSION_START';
+  }
 
   newState = {
     ...newState,
@@ -633,80 +824,53 @@ export function executeResolution(state: GameState): GameState {
     active_offensive_beaut_id: newOffensiveBeautId,
     active_defensive_beaut_id: newDefensiveBeautId,
     drawn_card: null,
-    drawn_card_is_natural_trait: false,
     defensive_selected_card: null,
-    pending_offensive_trait: null,
-    pending_defensive_trait: null,
-    natural_trait_activation_pending: false,
-    natural_trait_beaut_id: null,
-    defensive_archetype_revealed: false,
+    hybrid_choice_pending: null,
     last_resolution: result,
     winner,
     turn_number: state.turn_number + 1,
     catch_up_traits_pending: catchUpPending,
     two_timer_secondary_pending: twoTimerPending,
+    two_timer_primary_result: twoTimerPending ? result.outcome : null,
+    immediate_redraw_pending: immediateRedraw && !twoTimerPending,
+    forced_line_change_pending: forcedLineChange,
     offensive_line_change_done: false,
     defensive_line_change_done: false,
   };
 
-  // If possession changed, reset active beauts
+  // Reset line change tracking on possession change or goal
   if (newPossession !== state.possession || result.goal_scored) {
+    newState = {
+      ...newState,
+      line_change_used_this_possession: { player1: false, player2: false },
+    };
     newState = setDefaultActiveBeauts(newState);
   }
 
   return newState;
 }
 
-// Apply catch-up trait cards to a player
+// Apply catch-up: move reserved traits to Action Deck
 export function applyCatchUpTraits(
   state: GameState,
   player: 'player1' | 'player2'
 ): GameState {
-  const roster = player === 'player1' ? state.player1 : state.player2;
+  let roster = player === 'player1' ? { ...state.player1 } : { ...state.player2 };
+  const count = Math.min(state.catch_up_traits_pending?.count || 2, roster.reserved_traits.length);
 
-  // Find beauts without trait cards that need one
-  let beauts = [...roster.beauts];
-  let traitsGranted = 0;
+  // Move up to 'count' reserved traits to the Action Deck
+  const traitsToAdd = roster.reserved_traits.slice(0, count);
+  const remainingReserved = roster.reserved_traits.slice(count);
 
-  for (let i = 0; i < beauts.length && traitsGranted < 2; i++) {
-    const b = beauts[i];
-    if (!b.trait_card && b.trait_archetype) {
-      const traitName = b.trait_archetype as TraitName;
-      const newTrait = createTraitCard(traitName, 'catch_up');
-
-      // Natural traits go in pile, forced traits held
-      if (isNaturalTrait(traitName)) {
-        const traitCard = createActionCard('Trait', traitName);
-        beauts[i] = {
-          ...b,
-          action_pile: shuffleArray([...b.action_pile, traitCard]),
-        };
-      } else {
-        beauts[i] = { ...b, trait_card: newTrait };
-      }
-      traitsGranted++;
-    }
-  }
-
-  const updatedRoster = { ...roster, beauts };
-  const newState = {
-    ...state,
-    catch_up_traits_pending: null,
+  roster = {
+    ...roster,
+    action_deck: [...roster.action_deck, ...traitsToAdd],
+    reserved_traits: remainingReserved,
   };
 
-  if (player === 'player1') {
-    return { ...newState, player1: updatedRoster };
-  }
-  return { ...newState, player2: updatedRoster };
-}
-
-// Spend a trait card from a beaut
-export function spendTraitCard(state: GameState, beautId: string): GameState {
-  const beaut = getBeaut(state, beautId);
-  if (!beaut || !beaut.trait_card) return state;
-
-  const updatedBeaut = { ...beaut, trait_card: null };
-  return updateBeaut(state, updatedBeaut);
+  let newState = updateRoster(state, player, roster);
+  newState = { ...newState, catch_up_traits_pending: null };
+  return newState;
 }
 
 // Get the active offensive player
@@ -719,20 +883,6 @@ export function getDefensivePlayer(state: GameState): 'player1' | 'player2' {
   return state.possession === 'player1' ? 'player2' : 'player1';
 }
 
-// Check if game is in global exhaustion state
-export function checkGlobalExhaustion(state: GameState): boolean {
-  const offRoster = state.possession === 'player1' ? state.player1 : state.player2;
-  const defRoster = state.possession === 'player1' ? state.player2 : state.player1;
-
-  const offOnIce = offRoster.on_ice.map(id => getBeaut({ ...state }, id)).filter(Boolean) as any[];
-  const defOnIce = defRoster.on_ice.map(id => getBeaut({ ...state }, id)).filter(Boolean) as any[];
-
-  const offExhausted = offOnIce.every((b: any) => b.is_exhausted || availableCards(b.action_pile).length === 0);
-  const defExhausted = defOnIce.every((b: any) => b.is_exhausted || availableCards(b.action_pile).length === 0);
-
-  return offExhausted && defExhausted;
-}
-
 // Set active offensive beaut manually
 export function setActiveOffensiveBeaut(state: GameState, beautId: string): GameState {
   return { ...state, active_offensive_beaut_id: beautId };
@@ -741,4 +891,22 @@ export function setActiveOffensiveBeaut(state: GameState, beautId: string): Game
 // Set active defensive beaut manually
 export function setActiveDefensiveBeaut(state: GameState, beautId: string): GameState {
   return { ...state, active_defensive_beaut_id: beautId };
+}
+
+// Check if all on-ice Beauts for both players are exhausted
+export function checkGlobalExhaustion(state: GameState): boolean {
+  const offRoster = state.possession === 'player1' ? state.player1 : state.player2;
+  const defRoster = state.possession === 'player1' ? state.player2 : state.player1;
+
+  const offOnIce = offRoster.on_ice.map(id => getBeaut(state, id)).filter(Boolean) as BeautEntity[];
+  const defOnIce = defRoster.on_ice.map(id => getBeaut(state, id)).filter(Boolean) as BeautEntity[];
+
+  const offExhausted = offOnIce.every(b => b.is_exhausted || availableCards(b.action_pile).length === 0);
+  const defExhausted = defOnIce.every(b => b.is_exhausted || availableCards(b.action_pile).length === 0);
+
+  // Also check if Action Decks are empty
+  const offDeckEmpty = offRoster.action_deck.length === 0;
+  const defDeckEmpty = defRoster.action_deck.length === 0;
+
+  return offExhausted && defExhausted && offDeckEmpty && defDeckEmpty;
 }

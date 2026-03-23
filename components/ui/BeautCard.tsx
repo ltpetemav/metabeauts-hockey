@@ -71,7 +71,7 @@ export function BeautCard({
   const entity = isBeautEntity(beaut) ? beaut : null;
   const cardCount = entity ? availableCards(entity.action_pile).length : null;
   const exhausted = entity ? entity.is_exhausted : isExhausted;
-  const hasTrait = entity?.trait_card && !entity.trait_card.is_spent;
+  const hasTrait = entity ? entity.action_pile.some(c => c.is_trait) : false;
 
   const sizeClasses = {
     sm: 'w-20 h-28',

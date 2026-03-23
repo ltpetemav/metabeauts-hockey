@@ -21,13 +21,11 @@ import {
   performLineChange,
   performOffensiveDraw,
   submitDefensiveResponse,
-  activateForcedTrait,
   executeResolution,
   applyCatchUpTraits,
-  spendTraitCard,
   setActiveOffensiveBeaut,
   setActiveDefensiveBeaut,
-  checkGlobalExhaustion,
+  resolveHybridChoice,
   getBeaut,
 } from '@/lib/engine/gameEngine';
 import { availableCards } from '@/lib/engine/cards';
@@ -46,8 +44,8 @@ interface GameStore {
   gameState: GameState | null;
 
   // UI-specific state
-  currentViewingPlayer: 'player1' | 'player2'; // Hot-seat: which player is currently viewing
-  pendingHandoff: 'player1' | 'player2' | null; // Show handoff screen before switching view
+  currentViewingPlayer: 'player1' | 'player2';
+  pendingHandoff: 'player1' | 'player2' | null;
   resolutionAnimating: boolean;
   showResolutionResult: boolean;
   lastAction: string | null;
@@ -71,7 +69,7 @@ interface GameStore {
   skipLineChange: (player: 'player1' | 'player2') => void;
   drawOffensiveCard: () => void;
   selectDefensiveCard: (cardId: string) => void;
-  activateTrait: (player: 'player1' | 'player2', trait: TraitName | null) => void;
+  submitHybridChoice: (chosenType: CardType) => void;
   confirmResolution: () => void;
   dismissResolution: () => void;
   applyCatchUp: () => void;
@@ -84,7 +82,7 @@ interface GameStore {
   setRosterBrowsePosition: (pos: Position | null) => void;
 
   switchViewToPlayer: (player: 'player1' | 'player2') => void;
-  confirmHandoff: () => void; // Clears pendingHandoff and switches currentViewingPlayer
+  confirmHandoff: () => void;
 
   resetGame: () => void;
 }
@@ -109,13 +107,9 @@ export const useGameStore = create<GameStore>()(
       const { rosterSelection } = get();
       const current = rosterSelection[player];
 
-      // Max 6 beauts per player
       if (current.length >= 6) return;
-
-      // No duplicate token IDs
       if (current.find((b) => b.token_id === beaut.token_id)) return;
 
-      // Position limits: 2 Wingers, 1 Center, 2 Defenders, 1 Goaltender
       const positionCounts = current.reduce(
         (acc, b) => ({ ...acc, [b.position]: (acc[b.position as Position] || 0) + 1 }),
         {} as Record<Position, number>
@@ -126,9 +120,7 @@ export const useGameStore = create<GameStore>()(
         Defender: 2,
         Goaltender: 1,
       };
-      if ((positionCounts[beaut.position] || 0) >= positionLimits[beaut.position]) {
-        return; // Position slot full
-      }
+      if ((positionCounts[beaut.position] || 0) >= positionLimits[beaut.position]) return;
 
       set({
         rosterSelection: {
@@ -167,7 +159,7 @@ export const useGameStore = create<GameStore>()(
         currentViewingPlayer: 'player1',
         showResolutionResult: false,
         resolutionAnimating: false,
-        lastAction: 'Game started! Player 1 wins RPS or both submit choices.',
+        lastAction: 'Game started!',
       });
     },
 
@@ -176,7 +168,6 @@ export const useGameStore = create<GameStore>()(
       if (!gameState) return;
       const newState = submitRPS(gameState, player, choice);
 
-      // After P1 picks, hand off to P2. After P2 picks both are resolved — no handoff needed.
       const pendingHandoff: 'player1' | 'player2' | null =
         player === 'player1' ? 'player2' : null;
 
@@ -187,7 +178,6 @@ export const useGameStore = create<GameStore>()(
       const { gameState } = get();
       if (!gameState) return;
       let newState = performLineChange(gameState, player, swaps);
-      // After line change, advance phase if both done
       const offensivePlayer = gameState.possession;
       const defensivePlayer = offensivePlayer === 'player1' ? 'player2' : 'player1';
 
@@ -195,11 +185,9 @@ export const useGameStore = create<GameStore>()(
 
       if (player === offensivePlayer) {
         newState = { ...newState, offensive_line_change_done: true };
-        // Offense done — hand off to defense for their line change decision
         pendingHandoff = defensivePlayer;
       } else {
         newState = { ...newState, defensive_line_change_done: true };
-        // Defense done — both done, hand off to offensive player for the draw
         pendingHandoff = offensivePlayer;
       }
 
@@ -221,13 +209,10 @@ export const useGameStore = create<GameStore>()(
         newState = { ...newState, defensive_line_change_done: true };
       }
 
-      // If both line changes resolved, move to offensive draw
       if (newState.offensive_line_change_done && newState.defensive_line_change_done) {
         newState = { ...newState, phase: 'OFFENSIVE_DRAW' };
-        // Hand off to offensive player to draw their card
         pendingHandoff = offensivePlayer;
       } else if (newState.offensive_line_change_done) {
-        // Now it's defensive player's turn for line change — hand off to them
         newState = { ...newState, phase: 'LINE_CHANGE_DEFENSIVE' };
         pendingHandoff = defensivePlayer;
       }
@@ -240,16 +225,22 @@ export const useGameStore = create<GameStore>()(
       if (!gameState || gameState.phase !== 'OFFENSIVE_DRAW') return;
       const newState = performOffensiveDraw(gameState);
 
-      // After drawing, the defensive player needs to respond — hand off to them
       const defensivePlayer =
         gameState.possession === 'player1' ? 'player2' : 'player1';
-      const pendingHandoff: 'player1' | 'player2' | null =
-        newState.phase === 'DEFENSIVE_RESPONSE' ? defensivePlayer : null;
+
+      // Determine handoff based on new phase
+      let pendingHandoff: 'player1' | 'player2' | null = null;
+      if (newState.phase === 'DEFENSIVE_RESPONSE') {
+        pendingHandoff = defensivePlayer;
+      } else if (newState.phase === 'HYBRID_CHOICE') {
+        // Hybrid: offense needs to choose — stay with current player
+        pendingHandoff = null;
+      }
 
       set({
         gameState: newState,
         lastAction: newState.drawn_card
-          ? `Drew: ${newState.drawn_card.card_type}`
+          ? `Drew: ${newState.drawn_card.card_type}${newState.drawn_card.is_trait ? ` (${newState.drawn_card.trait_name})` : ''}`
           : 'Beaut exhausted!',
         pendingHandoff,
       });
@@ -259,30 +250,56 @@ export const useGameStore = create<GameStore>()(
       const { gameState } = get();
       if (!gameState || gameState.phase !== 'DEFENSIVE_RESPONSE') return;
       const newState = submitDefensiveResponse(gameState, cardId);
-      set({ gameState: newState, lastAction: 'Defense card selected' });
+
+      // If still in DEFENSIVE_RESPONSE (Butterfly re-pick), no handoff needed
+      if (newState.phase === 'DEFENSIVE_RESPONSE') {
+        set({ gameState: newState, lastAction: 'Butterfly — pick again!' });
+        return;
+      }
+
+      // If HYBRID_CHOICE for defense, stay with defensive player
+      if (newState.phase === 'HYBRID_CHOICE') {
+        set({ gameState: newState, lastAction: 'Hybrid — choose your action!' });
+        return;
+      }
+
+      // SIMULTANEOUS_REVEAL — no handoff, both can see
+      set({ gameState: newState, lastAction: 'Defense card selected — reveal!' });
     },
 
-    activateTrait: (player, trait) => {
+    submitHybridChoice: (chosenType) => {
       const { gameState } = get();
-      if (!gameState) return;
-      const newState = activateForcedTrait(gameState, player, trait);
+      if (!gameState || gameState.phase !== 'HYBRID_CHOICE' || !gameState.hybrid_choice_pending) return;
+
+      const newState = resolveHybridChoice(gameState, chosenType);
+
+      const defensivePlayer =
+        gameState.possession === 'player1' ? 'player2' : 'player1';
+
+      let pendingHandoff: 'player1' | 'player2' | null = null;
+      if (newState.phase === 'DEFENSIVE_RESPONSE') {
+        pendingHandoff = defensivePlayer;
+      }
+
       set({
         gameState: newState,
-        lastAction: trait ? `${player} activated ${trait}` : `${player} skipped trait`,
+        lastAction: `Hybrid: chose ${chosenType}`,
+        pendingHandoff,
       });
     },
 
     confirmResolution: () => {
       const { gameState } = get();
-      if (!gameState || gameState.phase !== 'TRAIT_WINDOW') return;
-      
-      // Execute resolution only if both offensive and defensive cards are set
+      if (!gameState) return;
+      if (gameState.phase !== 'SIMULTANEOUS_REVEAL') return;
       if (!gameState.drawn_card || !gameState.defensive_selected_card) return;
-      
+
       set({ resolutionAnimating: true });
-      
+
       setTimeout(() => {
-        const newState = executeResolution(gameState);
+        const currentState = get().gameState;
+        if (!currentState) return;
+        const newState = executeResolution(currentState);
         set({
           gameState: newState,
           resolutionAnimating: false,
@@ -298,20 +315,20 @@ export const useGameStore = create<GameStore>()(
       const { gameState } = get();
       if (!gameState) return;
 
-      // Apply catch-up traits if pending
       if (gameState.catch_up_traits_pending) {
         const newState = applyCatchUpTraits(gameState, gameState.catch_up_traits_pending.player_id);
         set({ gameState: newState, showResolutionResult: false });
         return;
       }
 
-      // After resolution, determine who acts next for a handoff
-      // If going back to POSSESSION_START, the possession player is next
-      // If RPS (new possession round), default to player1 first for RPS
       const nextPhase = gameState.phase;
       let pendingHandoff: 'player1' | 'player2' | null = null;
       if (nextPhase === 'POSSESSION_START' || nextPhase === 'RPS') {
         pendingHandoff = gameState.possession;
+      } else if (nextPhase === 'OFFENSIVE_DRAW') {
+        pendingHandoff = gameState.possession;
+      } else if (nextPhase === 'FORCED_LINE_CHANGE' && gameState.forced_line_change_pending) {
+        pendingHandoff = gameState.forced_line_change_pending;
       }
 
       set({ showResolutionResult: false, pendingHandoff });

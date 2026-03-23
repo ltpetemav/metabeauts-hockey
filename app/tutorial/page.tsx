@@ -115,7 +115,7 @@ function TutorialGameContent() {
               onSkipLineChange={handleSkipLineChange}
               onDrawCard={handleDrawCard}
               onSelectDefensiveCard={selectDefensiveCard}
-              onActivateTrait={() => {}}
+              onSubmitHybridChoice={() => {}}
               onConfirmResolution={handleConfirmResolution}
             />
           </div>
@@ -161,7 +161,7 @@ interface TurnPanelWithSpotlightsProps {
   onSkipLineChange: (player: 'player1' | 'player2') => void;
   onDrawCard: () => void;
   onSelectDefensiveCard: (cardId: string) => void;
-  onActivateTrait: (player: 'player1' | 'player2', trait: any) => void;
+  onSubmitHybridChoice: (chosenType: any) => void;
   onConfirmResolution: () => void;
 }
 
@@ -174,7 +174,7 @@ function TurnPanelWithSpotlights(props: TurnPanelWithSpotlightsProps) {
   const phaseSpotlightId =
     gameState.phase === 'RPS' ? 'tutorial-rps-area' :
     gameState.phase === 'OFFENSIVE_DRAW' ? 'tutorial-draw-btn' :
-    gameState.phase === 'TRAIT_WINDOW' ? 'tutorial-resolve-btn' :
+    gameState.phase === 'SIMULTANEOUS_REVEAL' ? 'tutorial-resolve-btn' :
     gameState.phase === 'DEFENSIVE_RESPONSE' ? 'tutorial-drawn-card' :
     undefined;
 
@@ -190,7 +190,7 @@ function TurnPanelWithSpotlights(props: TurnPanelWithSpotlightsProps) {
         onLineChange={() => {}}
         onDrawCard={props.onDrawCard}
         onSelectDefensiveCard={props.onSelectDefensiveCard}
-        onActivateTrait={props.onActivateTrait}
+        onSubmitHybridChoice={props.onSubmitHybridChoice}
         onConfirmResolution={props.onConfirmResolution}
       />
     </div>

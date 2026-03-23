@@ -23,7 +23,7 @@ export default function GamePage() {
     skipLineChange,
     drawOffensiveCard,
     selectDefensiveCard,
-    activateTrait,
+    submitHybridChoice,
     confirmResolution,
     dismissResolution,
     setActiveOffensiveBeaut,
@@ -108,7 +108,7 @@ export default function GamePage() {
               onLineChange={(player, swaps) => doLineChange(player, swaps)}
               onDrawCard={drawOffensiveCard}
               onSelectDefensiveCard={selectDefensiveCard}
-              onActivateTrait={(player, trait) => activateTrait(player, trait)}
+              onSubmitHybridChoice={submitHybridChoice}
               onConfirmResolution={confirmResolution}
             />
           </div>

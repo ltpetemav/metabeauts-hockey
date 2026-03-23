@@ -1,9 +1,9 @@
 /**
- * Action card definitions, position compositions, and deck building.
- * Based on spec Section 2.4
+ * Action card definitions, position compositions, deck building, and card cycling.
+ * New Action Deck system: cards return to a shared pool after use.
  */
 
-import { Position, CardType, ActionCard, TraitName, TraitType } from '@/types/game';
+import { Position, CardType, ActionCard, TraitName, BeautEntity } from '@/types/game';
 import { v4 as uuidv4 } from 'uuid';
 
 // Position-legal card types (which cards each position can hold)
@@ -27,6 +27,30 @@ export const POSITION_LEGAL_CARDS: Record<Position, CardType[]> = {
   Center: ['Shoot', 'Pass', 'Skate', 'Block', 'Steal'],
   Defender: ['Pass', 'Skate', 'Block', 'Catch', 'Steal', 'Check'],
   Goaltender: ['Block', 'Catch'],
+};
+
+// Primary Action per position (for Two-Way, Two-Timer, Defensive/Offensive archetype)
+export const PRIMARY_ACTION: Record<Position, CardType> = {
+  Winger: 'Shoot',
+  Center: 'Pass',
+  Defender: 'Skate',
+  Goaltender: 'Block',
+};
+
+// Backup Action per position (for Two-Timer fallback)
+export const BACKUP_ACTION: Record<Position, CardType> = {
+  Winger: 'Pass',
+  Center: 'Skate',
+  Defender: 'Block',
+  Goaltender: 'Catch',
+};
+
+// Position's default defensive action (for "Position Action" traits on defense)
+export const POSITION_DEFENSE_ACTION: Record<Position, CardType | null> = {
+  Winger: null, // Wingers have no defensive cards
+  Center: 'Steal',
+  Defender: 'Check',
+  Goaltender: 'Catch',
 };
 
 // Default starting card compositions per position for on-ice beauts (3 cards)
@@ -57,105 +81,160 @@ export function getDefaultBenchCards(position: Position): CardType[] {
   }
 }
 
-// Trait type mapping from trait name
-export const TRAIT_TYPES: Record<string, TraitType> = {
-  'Two-Way': 'Forced',
-  'Enforcer': 'Forced',
-  'Power Fwd': 'Forced',
-  'Sniper': 'Natural',
-  'Stand Up': 'Forced',
-  'Two-Timer': 'Natural',
-  'Hybrid': 'Forced',
-  'Dangler': 'Forced',
-  'Playmaker': 'Forced',
-  'Grinder': 'Forced',
-  'Puck Mover': 'Forced',
-  'Butterfly': 'Natural',
-  'Offensive': 'Forced',
-  'Defensive': 'Forced',
-};
-
-// Which traits go in the draw pile vs held separately
-export function isNaturalTrait(traitName: string): boolean {
-  const type = TRAIT_TYPES[traitName];
-  return type === 'Natural';
-}
-
 export function createActionCard(card_type: CardType, trait_name?: TraitName): ActionCard {
   return {
     id: uuidv4(),
     card_type,
     is_trait: card_type === 'Trait',
     trait_name,
-    trait_type: trait_name ? (TRAIT_TYPES[trait_name] as TraitType) : undefined,
-    state: 'in_pile',
-    returns_to_pile: trait_name === 'Butterfly',
   };
 }
 
-export function createTraitCard(traitName: TraitName, acquiredFrom: 'setup' | 'catch_up') {
-  return {
-    id: uuidv4(),
-    trait_name: traitName,
-    trait_type: (TRAIT_TYPES[traitName] || 'Forced') as TraitType,
-    is_spent: false,
-    returns_to_pile: traitName === 'Butterfly',
-    acquired_from: acquiredFrom,
-  };
-}
+/**
+ * Build the full 24-card Action Deck for a player.
+ * 18 position-based action cards + 6 trait cards (one per Beaut's archetype).
+ */
+export function buildFullDeck(beauts: BeautEntity[]): ActionCard[] {
+  const cards: ActionCard[] = [];
 
-// Build initial action card pile for a beaut
-// Natural traits go IN the pile; Forced traits are held separately
-export function buildActionPile(
-  position: Position,
-  isOnIce: boolean,
-  traitName?: string | null
-): ActionCard[] {
-  const cardTypes = isOnIce
-    ? getDefaultOnIceCards(position)
-    : getDefaultBenchCards(position);
-
-  const cards: ActionCard[] = cardTypes.map(ct => createActionCard(ct));
-
-  // If this beaut has a Natural trait, add it to the pile
-  if (traitName && isNaturalTrait(traitName)) {
-    cards.push(createActionCard('Trait', traitName as TraitName));
+  for (const beaut of beauts) {
+    // Each beaut contributes 3 action cards based on their position's on-ice defaults
+    const positionCards = getDefaultOnIceCards(beaut.position);
+    for (const ct of positionCards) {
+      cards.push(createActionCard(ct));
+    }
+    // Plus 1 trait card for this beaut's archetype
+    if (beaut.trait_archetype) {
+      cards.push(createActionCard('Trait', beaut.trait_archetype as TraitName));
+    }
   }
 
-  // Shuffle the pile
-  return shuffleArray(cards);
+  return cards; // Should be 24 cards (6 * 3 + 6)
+}
+
+/**
+ * Setup the Action Deck and Beaut piles.
+ * - Player auto-selects first 2 ice Beauts' traits as active (rest reserved)
+ * - Ice Beauts get 3 cards each, bench Beauts get 2 cards each
+ * - Remaining cards stay in the Action Deck
+ */
+export function setupActionDeck(
+  beauts: BeautEntity[],
+  onIceIds: string[],
+  _onBenchIds: string[]
+): {
+  updatedBeauts: BeautEntity[];
+  actionDeck: ActionCard[];
+  reservedTraits: ActionCard[];
+} {
+  const fullDeck = buildFullDeck(beauts);
+
+  // Separate trait cards and action cards
+  const traitCards = fullDeck.filter(c => c.is_trait);
+  const actionCards = fullDeck.filter(c => !c.is_trait);
+
+  // Auto-select first 2 on-ice Beauts' trait cards as active
+  const iceBeauts = beauts.filter(b => onIceIds.includes(b.id));
+  const activeTraitNames = new Set(iceBeauts.slice(0, 2).map(b => b.trait_archetype));
+  const activeTraits: ActionCard[] = [];
+  const reservedTraits: ActionCard[] = [];
+
+  for (const tc of traitCards) {
+    if (activeTraitNames.has(tc.trait_name!) && activeTraits.length < 2) {
+      activeTraits.push(tc);
+    } else {
+      reservedTraits.push(tc);
+    }
+  }
+
+  // Pool = actionCards + activeTraits
+  let pool = shuffleArray([...actionCards, ...activeTraits]);
+
+  // Load cards onto Beauts
+  const updatedBeauts = beauts.map(b => {
+    const isOnIce = onIceIds.includes(b.id);
+    const cardCount = isOnIce ? 3 : 2;
+    const defaultCards = isOnIce
+      ? getDefaultOnIceCards(b.position)
+      : getDefaultBenchCards(b.position);
+
+    // Try to find matching cards from pool for this position
+    const pile: ActionCard[] = [];
+    for (const needed of defaultCards) {
+      const idx = pool.findIndex(c => c.card_type === needed);
+      if (idx !== -1) {
+        pile.push(pool[idx]);
+        pool.splice(idx, 1);
+      } else {
+        // Fallback: create the card (shouldn't happen with balanced deck)
+        pile.push(createActionCard(needed));
+      }
+    }
+
+    // If we have an active trait for this Beaut and room, add it
+    if (pile.length < cardCount) {
+      const traitIdx = pool.findIndex(c => c.is_trait && c.trait_name === b.trait_archetype);
+      if (traitIdx !== -1) {
+        pile.push(pool[traitIdx]);
+        pool.splice(traitIdx, 1);
+      }
+    }
+
+    return {
+      ...b,
+      action_pile: shuffleArray(pile.slice(0, 3)), // Enforce max 3
+      is_exhausted: false,
+    };
+  });
+
+  // Remaining pool cards become the Action Deck
+  const actionDeck = pool;
+
+  return { updatedBeauts, actionDeck, reservedTraits };
 }
 
 // Deterministic shuffle using Fisher-Yates
 export function shuffleArray<T>(arr: T[]): T[] {
   const shuffled = [...arr];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    // Use Math.random for client-side preview; server uses CSPRNG
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
 }
 
-// Server-side RNG draw from a pile (top card drawn)
+// Draw a random card from a pile
 export function drawFromPile(pile: ActionCard[]): { drawn: ActionCard; remaining: ActionCard[] } | null {
-  const inPile = pile.filter(c => c.state === 'in_pile');
-  if (inPile.length === 0) return null;
-
-  // Server uses crypto.randomInt equivalent — here we use Math.random for client
-  const idx = Math.floor(Math.random() * inPile.length);
-  const drawn = { ...inPile[idx], state: 'played' as const };
-  const remaining = pile.filter(c => c.id !== inPile[idx].id);
+  if (pile.length === 0) return null;
+  const idx = Math.floor(Math.random() * pile.length);
+  const drawn = pile[idx];
+  const remaining = pile.filter((_, i) => i !== idx);
   return { drawn, remaining };
 }
 
-// Count available (in_pile) cards
+// All cards in pile are available (no state tracking needed)
 export function availableCards(pile: ActionCard[]): ActionCard[] {
-  return pile.filter(c => c.state === 'in_pile');
+  return pile;
+}
+
+// Return a card to the Action Deck
+export function returnCardToDeck(deck: ActionCard[], card: ActionCard): ActionCard[] {
+  return [...deck, { ...card }];
+}
+
+// Draw N cards from the Action Deck for a Beaut
+export function drawFromDeck(deck: ActionCard[], count: number): { drawn: ActionCard[]; remaining: ActionCard[] } {
+  const shuffled = shuffleArray(deck);
+  const drawn = shuffled.slice(0, count);
+  const remaining = shuffled.slice(count);
+  return { drawn, remaining };
 }
 
 // Is a card type legal for a position?
 export function isCardLegalForPosition(cardType: CardType, position: Position): boolean {
-  if (cardType === 'Trait') return true; // Trait always legal
+  if (cardType === 'Trait') return true;
   return POSITION_LEGAL_CARDS[position].includes(cardType);
 }
+
+// Max cards under a Beaut
+export const MAX_CARDS_PER_BEAUT = 3;

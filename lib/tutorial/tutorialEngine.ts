@@ -25,7 +25,6 @@ import {
   getBeaut,
 } from '@/lib/engine/gameEngine';
 import {
-  buildActionPile,
   createActionCard,
   availableCards,
 } from '@/lib/engine/cards';
@@ -165,10 +164,8 @@ export function createTutorialGameState(): GameState {
   const p1Entities = TUTORIAL_PLAYER1_METADATA.map(buildBeautEntity);
   const p2Entities = TUTORIAL_PLAYER2_METADATA.map(buildBeautEntity);
 
-  // Build game with RegularSeason mode for traits
   const state = createGameState(p1Entities, p2Entities, 'RegularSeason');
 
-  // Pre-configure: Player1 gets possession (tutorial always starts this way)
   return {
     ...state,
     possession: 'player1',
@@ -195,10 +192,10 @@ export function performScriptedOffensiveDraw(
   const drawn: ActionCard = createActionCard(scriptedCard);
 
   // Remove one card from pile (consume the draw)
-  const inPile = beaut.action_pile.filter(c => c.state === 'in_pile');
-  const remaining = inPile.length > 0
-    ? beaut.action_pile.filter(c => c.id !== inPile[0].id)
-    : beaut.action_pile;
+  const pile = beaut.action_pile;
+  const remaining = pile.length > 0
+    ? pile.slice(1) // Remove first card
+    : pile;
 
   // Update beaut
   const updatedBeaut = { ...beaut, action_pile: remaining };
@@ -209,9 +206,6 @@ export function performScriptedOffensiveDraw(
     ...state,
     player1: updatedPlayer1,
     drawn_card: drawn,
-    drawn_card_is_natural_trait: false,
-    natural_trait_activation_pending: false,
-    natural_trait_beaut_id: null,
     phase: 'DEFENSIVE_RESPONSE',
   };
 }
@@ -238,7 +232,6 @@ export function performScriptedDefensiveResponse(
   } else {
     // Create a scripted card even if they don't have it (tutorial scripting)
     cardToPlay = createActionCard(scriptedCard);
-    // Add it to pile temporarily
     const updatedBeaut = { ...beaut, action_pile: [...beaut.action_pile, cardToPlay] };
     const updatedPlayer2 = {
       ...state.player2,
@@ -254,7 +247,6 @@ export function performScriptedDefensiveResponse(
 // ── Scripted RPS: Player 1 always wins ────────────────────────────────────
 
 export function performScriptedRPS(state: GameState): GameState {
-  // Player 1 plays rock, Player 2 plays scissors (P1 wins)
   let newState = submitRPS(state, 'player1', 'rock');
   newState = submitRPS(newState, 'player2', 'scissors');
   return {

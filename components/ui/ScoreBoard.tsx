@@ -86,11 +86,12 @@ function formatPhase(phase: string): string {
     LINE_CHANGE_DEFENSIVE: '🔄 Def Change',
     OFFENSIVE_DRAW: '🎲 Drawing...',
     DEFENSIVE_RESPONSE: '🛡️ Defense',
-    TRAIT_WINDOW: '✨ Traits',
+    HYBRID_CHOICE: '🔀 Hybrid',
+    SIMULTANEOUS_REVEAL: '⚡ Reveal',
     RESOLUTION: '⚡ Resolving',
     POST_RESOLUTION: '📋 Post',
     GOAL_SCORED: '🚨 GOAL!',
-    GLOBAL_EXHAUSTION_REFRESH: '🔄 Refresh',
+    FORCED_LINE_CHANGE: '🔄 Forced Change',
     MATCH_END: '🏆 Over!',
   };
   return phaseMap[phase] || phase;

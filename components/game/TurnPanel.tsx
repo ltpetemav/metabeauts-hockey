@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { GameState, CardType, TraitName, RPSChoice, ActionCard } from '@/types/game';
+import { GameState, CardType, TraitName, RPSChoice } from '@/types/game';
 import { ActionCardUI } from '@/components/ui/ActionCardUI';
 import { availableCards } from '@/lib/engine/cards';
-import { describeOutcome } from '@/lib/engine/resolution';
 
 interface TurnPanelProps {
   gameState: GameState;
@@ -14,7 +13,7 @@ interface TurnPanelProps {
   onLineChange: (player: 'player1' | 'player2', swaps: Array<{ ice_beaut_id: string; bench_beaut_id: string; new_card: CardType }>) => void;
   onDrawCard: () => void;
   onSelectDefensiveCard: (cardId: string) => void;
-  onActivateTrait: (player: 'player1' | 'player2', trait: TraitName | null) => void;
+  onSubmitHybridChoice: (chosenType: CardType) => void;
   onConfirmResolution: () => void;
 }
 
@@ -26,7 +25,7 @@ export function TurnPanel({
   onLineChange,
   onDrawCard,
   onSelectDefensiveCard,
-  onActivateTrait,
+  onSubmitHybridChoice,
   onConfirmResolution,
 }: TurnPanelProps) {
   const { phase, possession, drawn_card, defensive_selected_card, mode } = gameState;
@@ -55,13 +54,13 @@ export function TurnPanel({
 
     return (
       <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-        <h3 className="text-white font-bold text-base sm:text-lg mb-2">✊ Rock-Paper-Scissors</h3>
+        <h3 className="text-white font-bold text-base sm:text-lg mb-2">Rock-Paper-Scissors</h3>
         <p className="text-gray-400 text-sm mb-3">
           {viewingPlayer === 'player1' ? 'Player 1' : 'Player 2'}: Choose your move!
           Winner gets possession.
         </p>
         {thisPlayerChose ? (
-          <div className="text-green-400 text-sm py-2">✅ Choice locked! Waiting for opponent...</div>
+          <div className="text-green-400 text-sm py-2">Choice locked! Waiting for opponent...</div>
         ) : (
           <div className="flex gap-2 sm:gap-3">
             {(['rock', 'paper', 'scissors'] as RPSChoice[]).map(choice => (
@@ -92,7 +91,7 @@ export function TurnPanel({
       return (
         <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
           <div className="text-gray-400 text-sm">
-            ⏳ Waiting for {isOffensivePlayer ? 'defense' : 'offense'} to decide on line change...
+            Waiting for {isOffensivePlayer ? 'defense' : 'offense'} to decide on line change...
           </div>
         </div>
       );
@@ -100,9 +99,36 @@ export function TurnPanel({
 
     return (
       <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-        <h3 className="text-white font-bold text-base sm:text-lg mb-2">🔄 Line Change?</h3>
+        <h3 className="text-white font-bold text-base sm:text-lg mb-2">Line Change?</h3>
         <p className="text-gray-400 text-sm mb-3">
-          {isOffensivePlayer ? '⚔️ Offense' : '🛡️ Defense'}: Do you want to make a line change before this possession?
+          {isOffensivePlayer ? 'Offense' : 'Defense'}: Do you want to make a line change?
+        </p>
+        <LineChangeUI
+          gameState={gameState}
+          player={viewingPlayer}
+          onConfirm={(swaps) => onLineChange(viewingPlayer, swaps)}
+          onSkip={() => onSkipLineChange(viewingPlayer)}
+        />
+      </div>
+    );
+  }
+
+  // --- FORCED_LINE_CHANGE (Enforcer) ---
+  if (phase === 'FORCED_LINE_CHANGE') {
+    const forcedPlayer = gameState.forced_line_change_pending;
+    if (forcedPlayer !== viewingPlayer) {
+      return (
+        <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
+          <div className="text-gray-400 text-sm">Waiting for opponent to do forced line change...</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-gray-900 border border-red-600 rounded-xl p-4">
+        <h3 className="text-red-400 font-bold text-base sm:text-lg mb-2">Enforcer — Forced Line Change!</h3>
+        <p className="text-gray-400 text-sm mb-3">
+          You must make a line change. Swap at least one Beaut.
         </p>
         <LineChangeUI
           gameState={gameState}
@@ -119,39 +145,85 @@ export function TurnPanel({
     if (!isOffensivePlayer) {
       return (
         <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-          <div className="text-gray-400 text-sm">🎲 Opponent is drawing an action card...</div>
+          <div className="text-gray-400 text-sm">Opponent is drawing an action card...</div>
         </div>
       );
     }
+
+    const deckSize = (possession === 'player1' ? gameState.player1 : gameState.player2).action_deck.length;
+
     return (
       <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-        <h3 className="text-white font-bold text-base sm:text-lg mb-2">🎲 Draw Your Card</h3>
+        <h3 className="text-white font-bold text-base sm:text-lg mb-2">Draw Your Card</h3>
         <p className="text-gray-400 text-sm mb-3">
-          Server will randomly draw from {offensiveBeaut?.name}&apos;s pile.
-          ({offensiveBeaut ? availableCards(offensiveBeaut.action_pile).length : 0} cards remaining)
+          Randomly draw from {offensiveBeaut?.name}&apos;s pile.
+          ({offensiveBeaut ? availableCards(offensiveBeaut.action_pile).length : 0} cards | Deck: {deckSize})
         </p>
         {gameState.can_shoot ? (
           <div className="bg-green-900/50 border border-green-600 rounded-lg px-3 py-2 mb-3 text-green-300 text-sm">
-            🎯 canShoot = TRUE — Shoot cards are eligible!
+            canShoot = TRUE — Shoot cards are eligible!
           </div>
         ) : (
           <div className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 mb-3 text-gray-400 text-sm">
-            ⛔ canShoot = FALSE — Must Pass or Skate first
+            canShoot = FALSE — Must Pass or Skate first (Shoot = TURNOVER)
+          </div>
+        )}
+        {gameState.immediate_redraw_pending && (
+          <div className="bg-purple-900/50 border border-purple-600 rounded-lg px-3 py-2 mb-3 text-purple-300 text-sm">
+            Immediate Re-Draw! (Trait bonus action)
           </div>
         )}
         <button
           onClick={onDrawCard}
           className="w-full py-4 rounded-xl bg-green-700 hover:bg-green-600 active:bg-green-800 text-white font-bold text-base sm:text-lg transition-all active:scale-95 min-h-[56px]"
         >
-          🎲 Draw Card (Server RNG)
+          Draw Card (Server RNG)
         </button>
       </div>
     );
   }
 
-  // --- DEFENSIVE_RESPONSE ---
+  // --- HYBRID_CHOICE ---
+  if (phase === 'HYBRID_CHOICE' && gameState.hybrid_choice_pending) {
+    const isMyChoice = gameState.hybrid_choice_pending.player === viewingPlayer;
+    const [optA, optB] = gameState.hybrid_choice_pending.options;
+
+    if (!isMyChoice) {
+      return (
+        <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
+          <div className="text-gray-400 text-sm">Opponent is choosing their Hybrid action...</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-gray-900 border border-purple-600 rounded-xl p-4">
+        <h3 className="text-purple-300 font-bold text-base sm:text-lg mb-2">Hybrid — Choose Your Action!</h3>
+        <p className="text-gray-400 text-sm mb-3">
+          Your Hybrid trait lets you pick between two options.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => onSubmitHybridChoice(optA)}
+            className="flex-1 py-4 rounded-xl bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white font-bold text-base transition-all active:scale-95 min-h-[56px]"
+          >
+            {optA}
+          </button>
+          <button
+            onClick={() => onSubmitHybridChoice(optB)}
+            className="flex-1 py-4 rounded-xl bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white font-bold text-base transition-all active:scale-95 min-h-[56px]"
+          >
+            {optB}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- DEFENSIVE_RESPONSE (BLIND — defense does NOT see offense's card) ---
   if (phase === 'DEFENSIVE_RESPONSE') {
     if (isOffensivePlayer) {
+      // Offense sees their own drawn card but waits for defense
       return (
         <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
           <h3 className="text-white font-bold mb-2 text-sm sm:text-base">You drew:</h3>
@@ -166,131 +238,82 @@ export function TurnPanel({
               </div>
             </div>
           )}
-          <p className="text-gray-400 text-sm mt-3">⏳ Waiting for defense to select their response...</p>
+          <p className="text-gray-400 text-sm mt-3">Waiting for defense to pick their card (blind)...</p>
         </div>
       );
     }
 
-    // Defensive player selects a card
+    // Defensive player selects a card — BLIND (cannot see offense's drawn card)
     if (!defensiveBeaut) return null;
     const availDef = availableCards(defensiveBeaut.action_pile);
 
     return (
       <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-        <h3 className="text-white font-bold text-base sm:text-lg mb-2">🛡️ Select Your Defense</h3>
+        <h3 className="text-white font-bold text-base sm:text-lg mb-2">Select Your Defense (Blind)</h3>
         <p className="text-gray-400 text-sm mb-2">
           {defensiveBeaut.name} — <span className="text-white font-bold">{availDef.length} cards</span>
         </p>
-        {drawn_card && (
-          <div className="mb-3 bg-gray-800 rounded-lg px-3 py-2">
-            <span className="text-gray-400 text-xs">Offense played: </span>
-            <span className="text-white font-bold">{drawn_card.card_type}</span>
-          </div>
-        )}
+        {/* NO offense card shown — defense picks BLIND */}
+        <div className="mb-3 bg-gray-800 rounded-lg px-3 py-2">
+          <span className="text-gray-500 text-xs">Offense has drawn a card — you cannot see it.</span>
+        </div>
         {availDef.length === 0 ? (
-          <div className="text-red-400">💀 No cards left — defense auto-fails!</div>
+          <div className="text-red-400">No cards left — defense auto-fails!</div>
         ) : (
           <div className="flex flex-wrap gap-2 sm:gap-2 justify-center">
             {availDef.map(card => (
               <ActionCardUI
                 key={card.id}
                 card={card}
-                isSelected={defensive_selected_card?.id === card.id}
                 onClick={() => onSelectDefensiveCard(card.id)}
                 size="md"
               />
             ))}
           </div>
         )}
-        {defensive_selected_card && (
-          <div className="mt-3 text-green-400 text-sm">
-            ✅ Selected: {defensive_selected_card.card_type}
-            {defensive_selected_card.is_trait && ` (Trait: ${defensive_selected_card.trait_name})`}
-          </div>
-        )}
       </div>
     );
   }
 
-  // --- TRAIT_WINDOW ---
-  if (phase === 'TRAIT_WINDOW') {
-    const myRoster = viewingPlayer === 'player1' ? gameState.player1 : gameState.player2;
-    const myBeautId = isOffensivePlayer ? offensiveBeautId : defensiveBeautId;
-    const myBeaut = myBeautId ? myRoster.beauts.find(b => b.id === myBeautId) : null;
-    const myTrait = myBeaut?.trait_card;
-    const hasForcedTrait = myTrait && !myTrait.is_spent && myTrait.trait_type === 'Forced' && mode === 'RegularSeason';
-
-    const alreadyActivated = isOffensivePlayer
-      ? gameState.pending_offensive_trait !== null
-      : gameState.pending_defensive_trait !== null;
-
+  // --- SIMULTANEOUS_REVEAL ---
+  if (phase === 'SIMULTANEOUS_REVEAL') {
     const bothCardsReady = drawn_card !== null && defensive_selected_card !== null;
 
     return (
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-        <h3 className="text-white font-bold text-base sm:text-lg mb-2">✨ Trait Window</h3>
+      <div className="bg-gray-900 border border-yellow-600 rounded-xl p-4">
+        <h3 className="text-yellow-400 font-bold text-base sm:text-lg mb-2">Simultaneous Reveal!</h3>
 
-        {/* Show both cards about to resolve — compact on mobile */}
         <div className="flex gap-2 sm:gap-4 justify-center mb-3">
           {drawn_card && (
             <div className="text-center">
-              <div className="text-xs text-orange-400 mb-1">⚔️ Off</div>
+              <div className="text-xs text-orange-400 mb-1">Offense</div>
               <ActionCardUI cardType={drawn_card.card_type} size="sm" />
-              <div className="text-xs text-gray-400 mt-1">{drawn_card.card_type}</div>
+              <div className="text-xs text-gray-400 mt-1">
+                {drawn_card.card_type}
+                {drawn_card.is_trait && <span className="text-purple-300"> ({drawn_card.trait_name})</span>}
+              </div>
             </div>
           )}
           <div className="flex items-center text-gray-500 text-base sm:text-xl font-bold">VS</div>
           {defensive_selected_card && (
             <div className="text-center">
-              <div className="text-xs text-blue-400 mb-1">🛡️ Def</div>
+              <div className="text-xs text-blue-400 mb-1">Defense</div>
               <ActionCardUI cardType={defensive_selected_card.card_type} size="sm" />
-              <div className="text-xs text-gray-400 mt-1">{defensive_selected_card.card_type}</div>
+              <div className="text-xs text-gray-400 mt-1">
+                {defensive_selected_card.card_type}
+                {defensive_selected_card.is_trait && <span className="text-purple-300"> ({defensive_selected_card.trait_name})</span>}
+              </div>
             </div>
           )}
         </div>
 
-        {hasForcedTrait && !alreadyActivated ? (
-          <div>
-            <div className="bg-purple-900/50 border border-purple-600 rounded-lg px-3 py-2 mb-3">
-              <div className="text-purple-300 font-bold text-sm">✨ {myTrait!.trait_name} available!</div>
-              <div className="text-purple-400 text-xs mt-1">
-                {isOffensivePlayer ? 'Offensive' : 'Defensive'}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => onActivateTrait(viewingPlayer, myTrait!.trait_name)}
-                className="flex-1 py-3 rounded-lg bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white font-bold text-sm transition-all min-h-[48px]"
-              >
-                ✨ Activate {myTrait!.trait_name}
-              </button>
-              <button
-                onClick={() => onActivateTrait(viewingPlayer, null)}
-                className="flex-1 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 active:bg-gray-800 text-white text-sm transition-all min-h-[48px]"
-              >
-                Skip
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div>
-            {mode === 'PreSeason' && (
-              <div className="text-gray-500 text-sm mb-2">🔕 Pre-Season: Traits disabled</div>
-            )}
-            {alreadyActivated && (
-              <div className="text-purple-400 text-sm mb-2">
-                ✨ Trait activated: {isOffensivePlayer ? gameState.pending_offensive_trait : gameState.pending_defensive_trait}
-              </div>
-            )}
-            {bothCardsReady && (
-              <button
-                onClick={onConfirmResolution}
-                className="w-full py-4 rounded-xl bg-red-700 hover:bg-red-600 active:bg-red-800 text-white font-bold text-base sm:text-lg transition-all active:scale-95 min-h-[56px]"
-              >
-                ⚡ Resolve Action!
-              </button>
-            )}
-          </div>
+        {bothCardsReady && (
+          <button
+            onClick={onConfirmResolution}
+            className="w-full py-4 rounded-xl bg-red-700 hover:bg-red-600 active:bg-red-800 text-white font-bold text-base sm:text-lg transition-all active:scale-95 min-h-[56px]"
+          >
+            Resolve Action!
+          </button>
         )}
       </div>
     );
@@ -306,7 +329,7 @@ export function TurnPanel({
           {winner === viewingPlayer ? 'YOU WIN!' : winner ? 'OPPONENT WINS!' : 'GAME OVER'}
         </h3>
         <div className="text-gray-400 mt-2 text-sm sm:text-base">
-          Final: {gameState.player1_score} – {gameState.player2_score}
+          Final: {gameState.player1_score} - {gameState.player2_score}
         </div>
       </div>
     );
@@ -319,7 +342,7 @@ export function TurnPanel({
   );
 }
 
-// Line Change sub-component — mobile-friendly
+// Line Change sub-component
 function LineChangeUI({
   gameState,
   player,
@@ -351,7 +374,6 @@ function LineChangeUI({
 
   return (
     <div>
-      {/* Stack vertically on mobile, 2-col on sm+ */}
       <div className="flex flex-col sm:grid sm:grid-cols-2 gap-3 mb-3">
         <div>
           <div className="text-xs text-gray-400 mb-1">Send to bench:</div>
@@ -422,14 +444,14 @@ function LineChangeUI({
             onClick={handleConfirm}
             className="flex-1 py-3 rounded-lg bg-blue-700 hover:bg-blue-600 active:bg-blue-800 text-white font-bold text-sm transition-all min-h-[48px]"
           >
-            ✅ Confirm
+            Confirm
           </button>
         )}
         <button
           onClick={() => onSkip(player)}
           className="flex-1 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 active:bg-gray-800 text-white text-sm transition-all min-h-[48px]"
         >
-          ⏩ Skip
+          Skip
         </button>
       </div>
     </div>

@@ -5,7 +5,6 @@ export type Tier = 1 | 2 | 3 | 4;
 export type TierName = 'Rookie' | 'Pro' | 'All-Star' | 'Legend';
 
 export type CardType = 'Shoot' | 'Pass' | 'Skate' | 'Block' | 'Catch' | 'Steal' | 'Check' | 'Trait';
-export type TraitType = 'Natural' | 'Forced' | 'Talent';
 
 export type TraitName =
   | 'Two-Way'
@@ -34,18 +33,19 @@ export type GamePhase =
   | 'LINE_CHANGE_OFFENSIVE'
   | 'LINE_CHANGE_DEFENSIVE'
   | 'OFFENSIVE_DRAW'
+  | 'HYBRID_CHOICE'
   | 'DEFENSIVE_RESPONSE'
-  | 'TRAIT_WINDOW'
+  | 'SIMULTANEOUS_REVEAL'
   | 'RESOLUTION'
   | 'POST_RESOLUTION'
   | 'GOAL_SCORED'
-  | 'GLOBAL_EXHAUSTION_REFRESH'
+  | 'FORCED_LINE_CHANGE'
   | 'MATCH_END';
 
 export type RPSChoice = 'rock' | 'paper' | 'scissors';
 export type RPSResult = 'player1' | 'player2' | 'tie';
 
-export type OutcomeType = 'OFFENSE_WINS' | 'DEFENSE_WINS' | 'GOAL_SCORED' | 'NO_EFFECT';
+export type OutcomeType = 'OFFENSE_WINS' | 'DEFENSE_WINS' | 'GOAL_SCORED' | 'NO_EFFECT' | 'TURNOVER';
 
 export interface BeautMetadata {
   token_id: number;
@@ -64,22 +64,10 @@ export interface ActionCard {
   card_type: CardType;
   is_trait: boolean;
   trait_name?: TraitName;
-  trait_type?: TraitType;
-  state: 'in_pile' | 'played' | 'discarded' | 'held';
-  returns_to_pile: boolean; // only true for Butterfly
-}
-
-export interface TraitCard {
-  id: string;
-  trait_name: TraitName;
-  trait_type: TraitType;
-  is_spent: boolean;
-  returns_to_pile: boolean;
-  acquired_from: 'setup' | 'catch_up';
 }
 
 export interface BeautEntity {
-  id: string; // token_id as string
+  id: string;
   token_id: number;
   name: string;
   position: Position;
@@ -87,50 +75,43 @@ export interface BeautEntity {
   trait_archetype: TraitName | string;
   image_url: string;
   team: string;
-  // In-game state
-  action_pile: ActionCard[]; // Face-down cards under this Beaut
-  trait_card: TraitCard | null; // Held trait card (held separately, not in pile unless Natural)
+  action_pile: ActionCard[]; // Face-down cards under this Beaut (max 3)
   is_exhausted: boolean;
-  can_shoot: boolean; // per-beaut shoot eligibility (set by pass/skate)
 }
 
 export interface PlayerRoster {
   player_id: 'player1' | 'player2';
-  beauts: BeautEntity[]; // All 6 beauts
-  on_ice: string[]; // 3 beaut IDs currently on ice
-  on_bench: string[]; // 3 beaut IDs on bench
+  beauts: BeautEntity[];
+  on_ice: string[];
+  on_bench: string[];
+  action_deck: ActionCard[]; // Shared card pool that cards return to
+  reserved_traits: ActionCard[]; // Trait cards set aside at setup (added via catch-up)
 }
 
 export interface ResolutionResult {
   outcome: OutcomeType;
   offensive_card: CardType;
   defensive_card: CardType;
+  offensive_trait_name?: TraitName;
+  defensive_trait_name?: TraitName;
   goal_scored: boolean;
-  puck_goes_to: 'offense' | 'defense' | null; // null = unchanged
+  puck_goes_to: 'offense' | 'defense' | null;
   offensive_beaut_id: string;
   defensive_beaut_id: string;
   cards_discarded_from_offense: number;
   cards_discarded_from_defense: number;
   special_effects: SpecialEffect[];
   exhausted_beauts: string[];
+  // Card cycling: do these cards return to the Action Deck?
+  offensive_card_returns_to_deck: boolean;
+  defensive_card_returns_to_deck: boolean;
+  // Immediate re-draw for traits like Two-Way, Stand Up, Playmaker, Puck Mover
+  immediate_redraw: boolean;
+  immediate_redraw_side: 'offense' | 'defense' | null;
 }
 
 export interface SpecialEffect {
-  type:
-    | 'TWO_WAY_RETAIN'
-    | 'SNIPER_UNBLOCKABLE'
-    | 'POWER_FWD_EJECT'
-    | 'TWO_TIMER_FALLBACK'
-    | 'STAND_UP_COUNTERATTACK'
-    | 'BUTTERFLY_RETURN'
-    | 'PUCK_MOVER_NO_STEAL'
-    | 'PLAYMAKER_BONUS_CARD'
-    | 'GRINDER_DISCARD'
-    | 'DANGLER_DRAIN'
-    | 'ENFORCER_DRAIN'
-    | 'HYBRID_CHOICE'
-    | 'OFFENSIVE_ARCHETYPE_PICK'
-    | 'DEFENSIVE_ARCHETYPE_SEE';
+  type: string;
   beaut_id?: string;
   data?: Record<string, unknown>;
 }
@@ -146,8 +127,8 @@ export interface GameState {
   player1_score: number;
   player2_score: number;
 
-  possession: 'player1' | 'player2'; // who has the puck
-  can_shoot: boolean; // global canShoot state for current possession
+  possession: 'player1' | 'player2';
+  can_shoot: boolean;
 
   active_offensive_beaut_id: string | null;
   active_defensive_beaut_id: string | null;
@@ -159,12 +140,7 @@ export interface GameState {
 
   // Current turn context
   drawn_card: ActionCard | null;
-  drawn_card_is_natural_trait: boolean;
   defensive_selected_card: ActionCard | null;
-
-  // Pending trait activations
-  pending_offensive_trait: TraitName | null;
-  pending_defensive_trait: TraitName | null;
 
   // Last resolution result (for UI display)
   last_resolution: ResolutionResult | null;
@@ -175,22 +151,29 @@ export interface GameState {
   // Turn counter
   turn_number: number;
 
-  // Phase for which player is acting (used in LINE_CHANGE phases)
+  // Phase for which player is acting
   acting_player: 'player1' | 'player2' | null;
 
-  // Catch-up trait grants pending
-  catch_up_traits_pending: { player_id: 'player1' | 'player2'; count: number } | null;
-
-  // Natural trait activation prompt
-  natural_trait_activation_pending: boolean;
-  natural_trait_beaut_id: string | null;
-
-  // Line change phase tracking
+  // Line change tracking
   offensive_line_change_done: boolean;
   defensive_line_change_done: boolean;
+  line_change_used_this_possession: { player1: boolean; player2: boolean };
 
-  // Defensive archetype: did defensive player see offense card?
-  defensive_archetype_revealed: boolean;
+  // Hybrid choice: when a Hybrid trait is drawn, player must choose between 2 options
+  hybrid_choice_pending: {
+    player: 'player1' | 'player2';
+    options: [CardType, CardType];
+    resolved_card_type?: CardType;
+  } | null;
+
+  // Immediate re-draw pending (Two-Way, Stand Up, Puck Mover, Playmaker)
+  immediate_redraw_pending: boolean;
+
+  // Forced line change (Enforcer offensive)
+  forced_line_change_pending: 'player1' | 'player2' | null;
+
+  // Catch-up: reserved trait selection pending after a goal
+  catch_up_traits_pending: { player_id: 'player1' | 'player2'; count: number } | null;
 
   // Two-timer: is a secondary draw pending?
   two_timer_secondary_pending: boolean;

@@ -150,7 +150,7 @@ const lesson2Steps: TutorialStep[] = [
     dialogue: "Hit 'Resolve Action' to see what happens!",
     spotlight: 'tutorial-resolve-btn',
     waitFor: 'click-spotlight',
-    phase: 'TRAIT_WINDOW',
+    phase: 'SIMULTANEOUS_REVEAL',
   },
   {
     id: 'l2-result',
@@ -190,7 +190,7 @@ const lesson3Steps: TutorialStep[] = [
     dialogue: "Defense played Check — but Check only stops Skate! Your Pass goes through. Resolve it!",
     spotlight: 'tutorial-resolve-btn',
     waitFor: 'click-spotlight',
-    phase: 'TRAIT_WINDOW',
+    phase: 'SIMULTANEOUS_REVEAL',
   },
   {
     id: 'l3-can-shoot-on',
@@ -218,7 +218,7 @@ const lesson3Steps: TutorialStep[] = [
     dialogue: "Defense played Steal — bad read! Steal only stops Pass. Your Shoot goes right through. Resolve it!",
     spotlight: 'tutorial-resolve-btn',
     waitFor: 'click-spotlight',
-    phase: 'TRAIT_WINDOW',
+    phase: 'SIMULTANEOUS_REVEAL',
   },
   {
     id: 'l3-goal',
