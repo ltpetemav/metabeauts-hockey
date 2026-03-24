@@ -125,6 +125,7 @@ const lesson2Steps: TutorialStep[] = [
     waitFor: 'click-spotlight',
     phase: 'OFFENSIVE_DRAW',
     scriptedOffensiveDraw: 'Skate',
+    scriptedDefensiveCard: 'Steal',
   },
   {
     id: 'l2-drew-skate',

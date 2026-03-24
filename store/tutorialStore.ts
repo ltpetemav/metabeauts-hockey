@@ -143,26 +143,43 @@ export const useTutorialStore = create<TutorialStore>()(
         }
       }
 
+      // Auto-play defense if game is stuck in DEFENSIVE_RESPONSE with a pending scripted card
+      if (newGameState && newGameState.phase === 'DEFENSIVE_RESPONSE' && newGameState.drawn_card) {
+        const pendingDef = get().scriptedDefensePending;
+        if (pendingDef) {
+          console.log('[Tutorial Auto-Defense]', pendingDef, 'in advanceStep');
+          newGameState = performScriptedDefensiveResponse(newGameState, pendingDef);
+        }
+      }
+
       // Auto-resolve if game is in SIMULTANEOUS_REVEAL with both cards ready
       // This prevents the tutorial from getting stuck when steps don't require
       // explicit "Resolve Action" clicks
       if (newGameState && newGameState.phase === 'SIMULTANEOUS_REVEAL' &&
           newGameState.drawn_card && newGameState.defensive_selected_card) {
+        const drawnType = newGameState.drawn_card.card_type;
+        const defType = newGameState.defensive_selected_card.card_type;
+        console.log('[Tutorial Auto-Resolve] Before:', drawnType, 'vs', defType, 'can_shoot:', newGameState.can_shoot);
+        
         const resolved = executeResolution(newGameState);
         let finalState = resolved;
         if (finalState.catch_up_traits_pending) {
           finalState = applyCatchUpTraits(finalState, finalState.catch_up_traits_pending.player_id);
         }
-        // Preserve can_shoot for tutorial
-        const drawnType = newGameState.drawn_card?.card_type;
+        
+        console.log('[Tutorial Auto-Resolve] After resolution:', 'outcome:', resolved.last_resolution?.outcome, 'can_shoot:', finalState.can_shoot);
+        
+        // Force can_shoot for successful Pass or Skate (belt + suspenders with engine logic)
         if ((drawnType === 'Pass' || drawnType === 'Skate') &&
-            resolved.last_resolution?.outcome !== 'DEFENSE_WINS') {
+            resolved.last_resolution?.outcome !== 'DEFENSE_WINS' &&
+            resolved.last_resolution?.outcome !== 'TURNOVER') {
           finalState = { ...finalState, can_shoot: true };
         }
         // Skip line changes for tutorial
         if (finalState.phase === 'POSSESSION_START') {
           finalState = performScriptedSkipBothLineChanges(finalState);
         }
+        console.log('[Tutorial Auto-Resolve] Final:', 'phase:', finalState.phase, 'can_shoot:', finalState.can_shoot);
         newGameState = finalState;
       }
 
