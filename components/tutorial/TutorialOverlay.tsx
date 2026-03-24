@@ -446,7 +446,7 @@ export function CongratulationsScreen({ onStartRealGame, onReplay }: Congratulat
           </div>
           <div className="bg-gray-900/50 rounded-lg p-3">
             <div className="text-lg mb-1">🎲</div>
-            <div>Offense draws. Defense chooses.</div>
+            <div>Offense draws. Defense picks blind.</div>
           </div>
           <div className="bg-gray-900/50 rounded-lg p-3">
             <div className="text-lg mb-1">✨</div>
