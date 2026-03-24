@@ -309,7 +309,7 @@ function SpotlightOverlay({ spotlightId, onSpotlightClick, waitFor }: SpotlightO
         }}
       />
 
-      {/* Spotlight cutout — always allows pointer events through so real buttons work */}
+      {/* Spotlight cutout — clicks pass through to game elements underneath */}
       <div
         className={`fixed z-40 rounded-xl transition-all ${
           waitFor === 'click-spotlight'

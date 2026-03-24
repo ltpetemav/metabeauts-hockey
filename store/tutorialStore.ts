@@ -143,6 +143,29 @@ export const useTutorialStore = create<TutorialStore>()(
         }
       }
 
+      // Auto-resolve if game is in SIMULTANEOUS_REVEAL with both cards ready
+      // This prevents the tutorial from getting stuck when steps don't require
+      // explicit "Resolve Action" clicks
+      if (newGameState && newGameState.phase === 'SIMULTANEOUS_REVEAL' &&
+          newGameState.drawn_card && newGameState.defensive_selected_card) {
+        const resolved = executeResolution(newGameState);
+        let finalState = resolved;
+        if (finalState.catch_up_traits_pending) {
+          finalState = applyCatchUpTraits(finalState, finalState.catch_up_traits_pending.player_id);
+        }
+        // Preserve can_shoot for tutorial
+        const drawnType = newGameState.drawn_card?.card_type;
+        if ((drawnType === 'Pass' || drawnType === 'Skate') &&
+            resolved.last_resolution?.outcome !== 'DEFENSE_WINS') {
+          finalState = { ...finalState, can_shoot: true };
+        }
+        // Skip line changes for tutorial
+        if (finalState.phase === 'POSSESSION_START') {
+          finalState = performScriptedSkipBothLineChanges(finalState);
+        }
+        newGameState = finalState;
+      }
+
       set({
         currentStepIndex: nextIndex,
         currentLesson: nextStep.lesson,
@@ -150,6 +173,7 @@ export const useTutorialStore = create<TutorialStore>()(
         scriptedDrawPending: nextStep.scriptedOffensiveDraw || null,
         scriptedDefensePending: nextStep.scriptedDefensiveCard || null,
         awaitingAutoDefense: false,
+        showResolutionResult: false,
       });
 
       get()._applyStep(nextStep);
