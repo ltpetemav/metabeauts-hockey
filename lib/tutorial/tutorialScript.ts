@@ -95,7 +95,7 @@ const lesson2Steps: TutorialStep[] = [
     id: 'l2-possession',
     lesson: 2,
     stepIndex: 2,
-    dialogue: "You won! You've got the puck. See that green indicator? That's you on offense. The other team is on defense.",
+    dialogue: "You won! You've got the puck. See the 🏒 indicator? That means you're on offense. The other team is on defense.",
     spotlight: 'tutorial-scoreboard',
     waitFor: 'advance',
   },
