@@ -253,7 +253,7 @@ const lesson4Steps: TutorialStep[] = [
     id: 'l4-line-change-intro',
     lesson: 4,
     stepIndex: 4,
-    dialogue: "Line changes. Every 3 turns, you can swap a tired Beaut for a fresh one from the bench. Bench Beauts recover — they get new cards while resting.",
+    dialogue: "Line changes. At the start of every possession, both teams get a chance to swap one Beaut from ice to bench. Bench Beauts get 2 fresh cards — plus 1 bonus card of your choice when they come back to ice.",
     spotlight: 'tutorial-rink-ice',
     waitFor: 'advance',
   },
