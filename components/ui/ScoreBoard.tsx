@@ -12,6 +12,13 @@ interface ScoreBoardProps {
   currentViewingPlayer: 'player1' | 'player2';
 }
 
+const WIN_GOALS = 3;
+
+/**
+ * Jumbotron — themed scoreboard with LED-grid background, neon-glow scores, and per-preset
+ * variants (HUD/Retro/Vapor/Topps). Replaces the prior flat ScoreBoard.
+ * Keeps the same prop interface so the rest of the gameplay flow is untouched.
+ */
 export function ScoreBoard({
   player1Score,
   player2Score,
@@ -19,57 +26,58 @@ export function ScoreBoard({
   canShoot,
   turnNumber,
   phase,
-  currentViewingPlayer,
+  currentViewingPlayer: _viewing,
 }: ScoreBoardProps) {
-  const WIN_GOALS = 3;
-
   return (
-    <div className="flex items-center justify-between bg-gray-900/90 border border-gray-700 rounded-xl px-3 py-2 sm:px-4 sm:py-2 w-full">
-      {/* Player 1 Score */}
-      <div className={`flex flex-col items-center min-w-[60px] sm:min-w-[80px] ${possession === 'player1' ? 'text-white' : 'text-gray-400'}`}>
-        <div className="text-xs font-semibold uppercase tracking-wider hidden sm:block">Player 1</div>
-        <div className="text-xs font-semibold sm:hidden">P1</div>
-        <div className="text-3xl sm:text-4xl font-black tabular-nums">{player1Score}</div>
-        <div className="flex gap-0.5 sm:gap-1 mt-1">
-          {Array.from({ length: WIN_GOALS }).map((_, i) => (
-            <div
-              key={i}
-              className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full border ${i < player1Score ? 'bg-white border-white' : 'border-gray-600 bg-transparent'}`}
-            />
-          ))}
+    <div className="jumbo">
+      <div className="jumbo-grid">
+        {/* P1 */}
+        <div className={`jb-team p1 ${possession === 'player1' ? 'pos' : ''}`}>
+          <div className="jb-badge">
+            <span>P1</span>
+          </div>
+          <div className="jb-info">
+            <div className="jb-name">Player 1</div>
+            <div className="jb-meta">
+              {possession === 'player1' && <span className="jb-puck">🏒 PUCK</span>}
+              <span className="jb-pips">
+                {Array.from({ length: WIN_GOALS }).map((_, i) => (
+                  <span key={i} className={`pip ${i < player1Score ? 'on' : ''}`} />
+                ))}
+              </span>
+            </div>
+          </div>
+          <div className="jb-score">{player1Score}</div>
         </div>
-        {possession === 'player1' && (
-          <div className="text-xs text-green-400 mt-0.5 animate-pulse">🏒</div>
-        )}
-      </div>
 
-      {/* Center info */}
-      <div className="flex flex-col items-center gap-0.5 sm:gap-1 flex-1 px-1">
-        <div className="text-gray-500 text-xs uppercase tracking-widest">VS</div>
-        <div className="text-gray-400 text-xs hidden sm:block">First to {WIN_GOALS}</div>
-        <div className={`text-xs px-1.5 py-0.5 rounded font-bold ${canShoot ? 'bg-green-700 text-green-200' : 'bg-gray-700 text-gray-400'}`}>
-          {canShoot ? '🎯 Shoot' : '⛔ No'}
+        {/* Center */}
+        <div className="jb-center">
+          <div className="jb-vs">VS</div>
+          <div className="jb-period">T{turnNumber}</div>
+          <div className={`jb-shot ${canShoot ? 'on' : 'off'}`}>
+            {canShoot ? '🎯 SHOOT' : '⛔ NO SHOT'}
+          </div>
+          <div className="jb-phase">{formatPhase(phase)}</div>
         </div>
-        <div className="text-gray-500 text-xs">T{turnNumber}</div>
-        <div className="text-gray-600 text-xs truncate max-w-[90px] sm:max-w-[120px] text-center">{formatPhase(phase)}</div>
-      </div>
 
-      {/* Player 2 Score */}
-      <div className={`flex flex-col items-center min-w-[60px] sm:min-w-[80px] ${possession === 'player2' ? 'text-white' : 'text-gray-400'}`}>
-        <div className="text-xs font-semibold uppercase tracking-wider hidden sm:block">Player 2</div>
-        <div className="text-xs font-semibold sm:hidden">P2</div>
-        <div className="text-3xl sm:text-4xl font-black tabular-nums">{player2Score}</div>
-        <div className="flex gap-0.5 sm:gap-1 mt-1">
-          {Array.from({ length: WIN_GOALS }).map((_, i) => (
-            <div
-              key={i}
-              className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full border ${i < player2Score ? 'bg-white border-white' : 'border-gray-600 bg-transparent'}`}
-            />
-          ))}
+        {/* P2 */}
+        <div className={`jb-team p2 ${possession === 'player2' ? 'pos' : ''}`}>
+          <div className="jb-score">{player2Score}</div>
+          <div className="jb-info right">
+            <div className="jb-name">Player 2</div>
+            <div className="jb-meta right">
+              <span className="jb-pips">
+                {Array.from({ length: WIN_GOALS }).map((_, i) => (
+                  <span key={i} className={`pip ${i < player2Score ? 'on' : ''}`} />
+                ))}
+              </span>
+              {possession === 'player2' && <span className="jb-puck">🏒 PUCK</span>}
+            </div>
+          </div>
+          <div className="jb-badge">
+            <span>P2</span>
+          </div>
         </div>
-        {possession === 'player2' && (
-          <div className="text-xs text-green-400 mt-0.5 animate-pulse">🏒</div>
-        )}
       </div>
     </div>
   );
@@ -84,15 +92,15 @@ function formatPhase(phase: string): string {
     POSSESSION_START: '🏒 Possession',
     LINE_CHANGE_OFFENSIVE: '🔄 Off Change',
     LINE_CHANGE_DEFENSIVE: '🔄 Def Change',
-    OFFENSIVE_DRAW: '🎲 Drawing...',
+    OFFENSIVE_DRAW: '🎲 Drawing',
     DEFENSIVE_RESPONSE: '🛡️ Defense',
     HYBRID_CHOICE: '🔀 Hybrid',
     SIMULTANEOUS_REVEAL: '⚡ Reveal',
     RESOLUTION: '⚡ Resolving',
     POST_RESOLUTION: '📋 Post',
     GOAL_SCORED: '🚨 GOAL!',
-    FORCED_LINE_CHANGE: '🔄 Forced Change',
-    MATCH_END: '🏆 Over!',
+    FORCED_LINE_CHANGE: '🔄 Forced',
+    MATCH_END: '🏆 Over',
   };
   return phaseMap[phase] || phase;
 }

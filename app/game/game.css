@@ -1,0 +1,619 @@
+/* MetaBeauts: Hockey — Gameplay route styles
+   Themed via the body[data-preset] variables. Ported from the design handoff's game.html. */
+
+/* ─── Stage shell ─── */
+.game-stage {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--bg-stage);
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--text);
+  font-family: var(--condensed-font, var(--body-font));
+}
+
+/* On desktop, lock the stage to the viewport (immersive, no scroll). */
+@media (min-width: 1024px) {
+  .game-stage {
+    position: fixed;
+    inset: 0;
+    min-height: 100vh;
+    overflow: hidden;
+    z-index: 30;
+  }
+}
+
+/* Arena spotlight — top + bottom radial gradients in --accent / --accent-2 */
+.game-stage-spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% -10%, color-mix(in oklab, var(--accent) 25%, transparent), transparent 60%),
+    radial-gradient(ellipse 60% 60% at 50% 110%, color-mix(in oklab, var(--accent-2, var(--accent)) 18%, transparent), transparent 60%);
+  opacity: .6;
+  mix-blend-mode: screen;
+}
+
+/* CRT scanlines + grain noise — togglable per-preset via --scan / --grain */
+.game-stage-crt {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9000;
+  background-image:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .12 0'/></filter><rect width='200' height='200' filter='url(%23n)'/></svg>");
+  background-size: auto, 240px 240px;
+  opacity: calc(var(--scan, 0) * 0.5 + var(--grain, 0) * 0.18);
+  mix-blend-mode: overlay;
+}
+
+/* CRT off on mobile (perf) — desktop only */
+@media (max-width: 1023px) {
+  .game-stage-crt { display: none; }
+}
+
+/* Retro preset gets stronger CRT */
+body[data-preset="retro"] .game-stage-crt {
+  opacity: 0.55;
+  background-image:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, .35) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(to right, rgba(255, 0, 170, .04) 0 2px, transparent 2px 4px);
+}
+
+/* ─── Frame layout ─── */
+.game-stage-frame {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 12px;
+  gap: 10px;
+}
+
+@media (min-width: 1024px) {
+  .game-stage-frame {
+    position: absolute;
+    inset: 0;
+    padding: 16px;
+    min-height: auto;
+  }
+}
+
+.game-stage-top { grid-row: 1; }
+.game-stage-center {
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.game-stage-bottom { grid-row: 3; }
+
+@media (min-width: 1024px) {
+  .game-stage-center { overflow: hidden; }
+}
+
+/* ─── Game-route header (back / new / viewing-player) ─── */
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--mono-font);
+}
+.game-header .crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02));
+  border: 1px solid var(--panel-border);
+  font-size: 11px;
+  letter-spacing: .12em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.game-header .crumb:hover { color: var(--text); border-color: var(--accent); }
+body[data-preset="topps"] .game-header .crumb { background: rgba(245, 230, 200, .9); color: var(--text-dim); }
+
+/* ─── Themed game over modal ─── */
+.game-end-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, .75);
+  backdrop-filter: blur(8px);
+  padding: 16px;
+}
+.game-end-card {
+  background: var(--panel-bg);
+  border: 2px solid var(--accent);
+  border-radius: 18px;
+  padding: 28px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--panel-glow, 0 0 60px rgba(0, 216, 255, .25));
+  color: var(--text);
+}
+.game-end-card .trophy { font-size: 64px; margin-bottom: 10px; }
+.game-end-card h2 {
+  font-family: var(--headline-font);
+  font-size: 38px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 12px;
+  text-shadow: var(--text-shadow);
+}
+.game-end-card .final-score {
+  font-family: var(--num-font);
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--text);
+  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.game-end-card p {
+  font-family: var(--mono-font);
+  font-size: 11px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 24px;
+}
+.game-end-card .new-game-btn {
+  width: 100%;
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-family: var(--headline-font);
+  font-size: 18px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2, var(--accent)));
+  color: #000;
+  box-shadow: 0 8px 22px color-mix(in oklab, var(--accent) 40%, transparent);
+}
+
+/* ─── No-game-in-progress fallback ─── */
+.no-game {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--bg-stage);
+  color: var(--text);
+  padding: 16px;
+}
+.no-game .inner {
+  text-align: center;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  padding: 40px 28px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: var(--panel-glow);
+}
+.no-game .icon { font-size: 56px; margin-bottom: 12px; }
+.no-game h1 {
+  font-family: var(--headline-font);
+  font-size: 28px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 22px;
+}
+.no-game .back-btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-family: var(--headline-font);
+  font-size: 16px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2, var(--accent)));
+  color: #000;
+}
+
+/* ─── Hide global MbNav on the gameplay route (immersive) ─── */
+@media (min-width: 1024px) {
+  body:has(.game-stage) > nav.mb-nav { display: none; }
+}
+
+/* ─── Jumbotron scoreboard ─── */
+.jumbo {
+  position: relative;
+  background: #000;
+  border: 2px solid rgba(255, 255, 255, .18);
+  border-radius: 18px;
+  padding: 12px 14px 10px;
+  box-shadow:
+    0 0 0 4px rgba(0, 0, 0, .6),
+    0 0 60px color-mix(in oklab, var(--accent) 25%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, .04),
+    inset 0 -20px 40px rgba(0, 0, 0, .6);
+  overflow: hidden;
+  width: 100%;
+}
+@media (min-width: 768px) {
+  .jumbo { padding: 14px 18px 12px; }
+}
+body[data-preset="topps"] .jumbo {
+  background: #1c0a0a;
+  border-color: #c41e3a;
+  box-shadow: 0 0 0 3px #f5e6c8, 0 8px 30px rgba(0, 0, 0, .7);
+}
+body[data-preset="topps"] .jumbo::before { display: none; }
+
+/* LED dot grid */
+.jumbo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, .06) 1px, transparent 1.5px);
+  background-size: 5px 5px;
+  mix-blend-mode: overlay;
+}
+
+.jumbo-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+@media (min-width: 768px) {
+  .jumbo-grid { gap: 18px; }
+}
+
+/* Teams */
+.jb-team {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+@media (min-width: 768px) {
+  .jb-team { gap: 12px; }
+}
+.jb-team.p2 {
+  grid-template-columns: auto 1fr auto;
+  text-align: right;
+}
+.jb-team.p2 .jb-score { order: -1; }
+
+.jb-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-family: var(--headline-font);
+  font-size: 16px;
+  letter-spacing: .04em;
+  color: #fff;
+  box-shadow: 0 0 16px currentColor;
+  flex-shrink: 0;
+}
+@media (min-width: 768px) {
+  .jb-badge { width: 48px; height: 48px; font-size: 22px; }
+}
+.jb-team.p1 .jb-badge { background: linear-gradient(135deg, #0072ff, #00b2e6); color: #0072ff; }
+.jb-team.p2 .jb-badge { background: linear-gradient(135deg, #ff3b5c, #ff8a3d); color: #ff3b5c; }
+.jb-badge span { color: #fff; text-shadow: 0 0 8px currentColor; }
+
+.jb-info { min-width: 0; overflow: hidden; }
+.jb-info.right { text-align: right; }
+
+.jb-name {
+  font-family: var(--headline-font);
+  font-size: 12px;
+  letter-spacing: .12em;
+  line-height: 1;
+  color: rgba(255, 255, 255, .9);
+  text-shadow: var(--text-shadow, 0 2px 0 rgba(0, 0, 0, .4));
+}
+@media (min-width: 768px) {
+  .jb-name { font-size: 16px; }
+}
+body[data-preset="topps"] .jb-name { color: #f5e6c8; }
+
+.jb-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono-font);
+  font-size: 9px;
+  letter-spacing: .1em;
+  color: rgba(255, 255, 255, .55);
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+@media (min-width: 768px) { .jb-meta { font-size: 10px; } }
+.jb-meta.right { justify-content: flex-end; }
+body[data-preset="topps"] .jb-meta { color: rgba(245, 230, 200, .6); }
+
+.jb-puck {
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--accent);
+  animation: blink 1.4s ease-in-out infinite;
+}
+@keyframes blink { 50% { opacity: .35; } }
+
+.jb-pips { display: inline-flex; gap: 3px; }
+.jb-pips .pip {
+  width: 6px; height: 6px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .3);
+  background: transparent;
+}
+.jb-pips .pip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+body[data-preset="topps"] .jb-pips .pip { border-color: rgba(245, 230, 200, .35); }
+body[data-preset="topps"] .jb-pips .pip.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+/* Score — the showpiece */
+.jb-score {
+  font-family: var(--font-vt323), 'VT323', monospace;
+  font-size: 56px;
+  line-height: .85;
+  color: var(--accent);
+  text-shadow: 0 0 12px var(--accent), 0 0 24px var(--accent);
+  letter-spacing: .05em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+@media (min-width: 768px) {
+  .jb-score { font-size: 96px; }
+}
+body[data-preset="hud"] .jb-score {
+  font-family: var(--num-font);
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 14px var(--accent), 0 4px 0 rgba(0, 0, 0, .5);
+}
+body[data-preset="topps"] .jb-score {
+  color: #f5e6c8;
+  text-shadow: 2px 2px 0 #c41e3a, 4px 4px 0 #000;
+  font-family: var(--headline-font);
+}
+.jb-team.p2 .jb-score {
+  color: var(--accent-2, var(--accent));
+  text-shadow: 0 0 12px var(--accent-2, var(--accent)), 0 0 24px var(--accent-2, var(--accent));
+}
+body[data-preset="hud"] .jb-team.p2 .jb-score {
+  color: #fff;
+  text-shadow: 0 0 14px var(--accent-2), 0 4px 0 rgba(0, 0, 0, .5);
+}
+body[data-preset="topps"] .jb-team.p2 .jb-score {
+  color: #f5e6c8;
+  text-shadow: 2px 2px 0 #1e3a8a, 4px 4px 0 #000;
+}
+
+/* Center */
+.jb-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+.jb-vs {
+  font-family: var(--headline-font);
+  font-size: 18px;
+  letter-spacing: .15em;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent);
+  line-height: 1;
+}
+@media (min-width: 768px) { .jb-vs { font-size: 26px; } }
+.jb-period {
+  font-family: var(--mono-font);
+  font-size: 10px;
+  letter-spacing: .25em;
+  color: rgba(255, 255, 255, .55);
+  text-transform: uppercase;
+}
+body[data-preset="topps"] .jb-period { color: rgba(245, 230, 200, .55); }
+.jb-shot {
+  font-family: var(--mono-font);
+  font-size: 9px;
+  letter-spacing: .15em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.jb-shot.on { background: rgba(34, 208, 129, .15); color: #2dd081; border: 1px solid rgba(34, 208, 129, .4); }
+.jb-shot.off { background: rgba(255, 255, 255, .04); color: rgba(255, 255, 255, .5); border: 1px solid rgba(255, 255, 255, .12); }
+.jb-phase {
+  font-family: var(--mono-font);
+  font-size: 8px;
+  letter-spacing: .15em;
+  color: rgba(255, 255, 255, .4);
+  text-transform: uppercase;
+  text-align: center;
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (min-width: 768px) { .jb-phase { font-size: 10px; max-width: 140px; } }
+
+/* ─── Top bar polish: LIVE pill + themed logo ─── */
+.game-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.game-topbar .left-meta { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.game-topbar .right-meta { display: flex; align-items: center; gap: 8px; justify-content: flex-end; min-width: 0; flex-wrap: wrap; }
+
+.live-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02));
+  border: 1px solid rgba(255, 255, 255, .1);
+  font-family: var(--mono-font);
+  font-size: 10px;
+  letter-spacing: .15em;
+  color: rgba(255, 255, 255, .85);
+  text-transform: uppercase;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+.live-pill .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  animation: blink 1.4s ease-in-out infinite;
+}
+body[data-preset="topps"] .live-pill { background: rgba(245, 230, 200, .85); color: #2c1810; border-color: #2c1810; }
+body[data-preset="topps"] .live-pill .dot { background: #c41e3a; box-shadow: 0 0 8px #c41e3a; }
+
+.game-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--headline-font);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+.game-logo-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: conic-gradient(from 210deg, var(--accent), var(--accent-2, var(--accent)), var(--accent));
+  position: relative;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 24px color-mix(in oklab, var(--accent) 60%, transparent);
+  flex-shrink: 0;
+}
+@media (min-width: 768px) { .game-logo-mark { width: 36px; height: 36px; } }
+.game-logo-mark::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 4px;
+  background: #000;
+  z-index: 1;
+}
+body[data-preset="topps"] .game-logo-mark::after { background: #fffaf0; }
+.game-logo-mark svg { position: relative; z-index: 2; width: 16px; height: 16px; }
+@media (min-width: 768px) { .game-logo-mark svg { width: 20px; height: 20px; } }
+
+.game-logo-text { display: flex; flex-direction: column; line-height: 1; }
+.game-logo-name { font-size: 14px; line-height: 1; color: var(--text); }
+@media (min-width: 768px) { .game-logo-name { font-size: 18px; } }
+.game-logo-name b { color: var(--accent); }
+.game-logo-sub {
+  font-size: 8px;
+  letter-spacing: .25em;
+  color: rgba(255, 255, 255, .4);
+  font-family: var(--mono-font);
+  font-weight: 500;
+  margin-top: 2px;
+}
+@media (min-width: 768px) { .game-logo-sub { font-size: 9px; } }
+body[data-preset="topps"] .game-logo-sub { color: rgba(245, 230, 200, .55); }
+
+/* ─── Themed overrides for legacy game components ───
+   Retroactively retheme TurnPanel, RinkLayout, ResolutionModal, HandoffScreen
+   without rewriting their JSX. Overrides only neutral grays — semantic colors
+   (yellow/green/red/blue/purple) for game state are preserved. */
+
+body:has(.game-stage) .bg-gray-900,
+body:has(.game-stage) .bg-gray-950,
+body:has(.game-stage) .bg-gray-800,
+body:has(.game-stage) .bg-gray-900\/30,
+body:has(.game-stage) .bg-gray-900\/50,
+body:has(.game-stage) .bg-gray-900\/60,
+body:has(.game-stage) .bg-gray-900\/80,
+body:has(.game-stage) .bg-gray-900\/90,
+body:has(.game-stage) .bg-gray-900\/95,
+body:has(.game-stage) .bg-gray-800\/60,
+body:has(.game-stage) .bg-gray-800\/95 {
+  background: var(--panel-bg);
+}
+
+body:has(.game-stage) .border-gray-700,
+body:has(.game-stage) .border-gray-600,
+body:has(.game-stage) .border-gray-800,
+body:has(.game-stage) .border-gray-700\/50,
+body:has(.game-stage) .border-gray-800\/50 {
+  border-color: var(--panel-border);
+}
+
+body:has(.game-stage) .text-white { color: var(--text); }
+body:has(.game-stage) .text-gray-300,
+body:has(.game-stage) .text-gray-400,
+body:has(.game-stage) .text-gray-500 { color: var(--text-dim); }
+
+/* Add panel glow to top-level rounded-xl containers in the game stage */
+body:has(.game-stage) .rounded-xl {
+  box-shadow: var(--panel-glow, 0 4px 12px rgba(0, 0, 0, .35));
+}
+
+/* HandoffScreen full-screen overlay — retheme to stage gradient */
+.game-stage-handoff {
+  position: fixed; inset: 0;
+  z-index: 50;
+  display: grid; place-items: center;
+  background: var(--bg-stage);
+  padding: 16px;
+  color: var(--text);
+}
+
+/* ResolutionModal accent borders — re-tone the yellow/blue using --accent */
+body:has(.game-stage) [class*="border-yellow-"],
+body:has(.game-stage) [class*="bg-yellow-9"] {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 12%, var(--panel-bg, transparent));
+}
+
+/* ResolutionModal panel — themed borders, accent shadow */
+body:has(.game-stage) .resolution-panel {
+  background: var(--panel-bg);
+  border: 2px solid var(--accent);
+  box-shadow: var(--panel-glow);
+}
+
+/* Apply panel-glow to large containers */
+body:has(.game-stage) .max-w-md.rounded-2xl,
+body:has(.game-stage) .max-w-lg.rounded-2xl {
+  box-shadow: var(--panel-glow, 0 12px 30px rgba(0, 0, 0, .5));
+}
+
+/* Topps preset: invert text colors inside panels (they're cream now) */
+body[data-preset="topps"] body:has(.game-stage) .text-white { color: #1a0f08; }
+body[data-preset="topps"] body:has(.game-stage) .text-gray-300,
+body[data-preset="topps"] body:has(.game-stage) .text-gray-400 { color: rgba(28, 15, 8, .65); }

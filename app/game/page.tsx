@@ -7,8 +7,9 @@ import { ScoreBoard } from '@/components/ui/ScoreBoard';
 import { RinkLayout } from '@/components/game/RinkLayout';
 import { TurnPanel } from '@/components/game/TurnPanel';
 import { ResolutionModal } from '@/components/game/ResolutionModal';
-import { RPSChoice } from '@/types/game';
 import { HandoffScreen } from '@/components/game/HandoffScreen';
+import GameStage from '@/components/game/GameStage';
+import './game.css';
 
 export default function GamePage() {
   const router = useRouter();
@@ -33,15 +34,12 @@ export default function GamePage() {
 
   if (!gameState) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4">
-        <div className="text-center">
-          <div className="text-4xl mb-4">🎮</div>
-          <h1 className="text-2xl font-bold text-white mb-2">No game in progress</h1>
-          <button
-            onClick={() => router.push('/roster')}
-            className="mt-4 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold min-h-[48px]"
-          >
-            ← Back to Roster Selection
+      <div className="no-game">
+        <div className="inner">
+          <div className="icon">🎮</div>
+          <h1>No game in progress</h1>
+          <button onClick={() => router.push('/roster')} className="back-btn">
+            ← Back to Roster
           </button>
         </div>
       </div>
@@ -52,36 +50,46 @@ export default function GamePage() {
     dismissResolution();
   };
 
-  return (
-    <div
-      className="min-h-screen"
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
-      <div className="max-w-7xl mx-auto px-3 py-3 md:p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => router.push('/')}
-            className="text-gray-400 hover:text-white text-sm min-h-[44px] min-w-[44px] flex items-center"
-          >
-            ← Home
-          </button>
-          <div className="text-xs sm:text-sm font-semibold text-gray-300">
-            {currentViewingPlayer === 'player1' ? '🔵 P1' : '🔴 P2'}&apos;s view
-          </div>
-          <button
-            onClick={() => {
-              resetGame();
-              router.push('/roster');
-            }}
-            className="text-gray-400 hover:text-white text-sm min-h-[44px] min-w-[44px] flex items-center justify-end"
-          >
-            New →
-          </button>
-        </div>
+  const topBar = (
+    <div className="game-topbar">
+      <div className="left-meta">
+        <button onClick={() => router.push('/')} className="crumb">← Home</button>
+        <div className="live-pill"><span className="dot" /> LIVE</div>
+        <div className="live-pill">T{gameState.turn_number}</div>
+      </div>
 
+      <div className="game-logo">
+        <span className="game-logo-mark">
+          <svg viewBox="0 0 24 24"><path d="M5 4 L19 4 L19 7 L13 7 L13 20 L11 20 L11 7 L5 7 Z" fill="white" /></svg>
+        </span>
+        <div className="game-logo-text">
+          <span className="game-logo-name">META<b>BEAUTS</b></span>
+          <span className="game-logo-sub">HOCKEY</span>
+        </div>
+      </div>
+
+      <div className="right-meta">
+        <div className="crumb" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+          {currentViewingPlayer === 'player1' ? '🔵 P1' : '🔴 P2'}
+        </div>
+        <button
+          onClick={() => {
+            resetGame();
+            router.push('/roster');
+          }}
+          className="crumb"
+        >
+          New →
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <GameStage topBar={topBar}>
         {/* Scoreboard */}
-        <div className="mb-3">
+        <div>
           <ScoreBoard
             player1Score={gameState.player1_score}
             player2Score={gameState.player2_score}
@@ -95,11 +103,9 @@ export default function GamePage() {
 
         {/* Main game area
             Mobile: TurnPanel first (most interactive), then Rink below
-            Desktop (lg): Rink left (2/3), TurnPanel right (1/3)
-        */}
-        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3">
-          {/* TurnPanel — on mobile rendered FIRST so it's immediately visible */}
-          <div className="order-1 lg:order-2 lg:col-start-3">
+            Desktop (lg): Rink left (2/3), TurnPanel right (1/3) */}
+        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3 flex-1 min-h-0">
+          <div className="order-1 lg:order-2 lg:col-start-3 lg:overflow-y-auto">
             <TurnPanel
               gameState={gameState}
               viewingPlayer={currentViewingPlayer}
@@ -113,8 +119,7 @@ export default function GamePage() {
             />
           </div>
 
-          {/* Rink — on mobile rendered SECOND (below TurnPanel) */}
-          <div className="order-2 lg:order-1 lg:col-span-2 lg:col-start-1 lg:row-start-1">
+          <div className="order-2 lg:order-1 lg:col-span-2 lg:col-start-1 lg:row-start-1 lg:overflow-y-auto">
             <RinkLayout
               gameState={gameState}
               viewingPlayer={currentViewingPlayer}
@@ -123,49 +128,47 @@ export default function GamePage() {
             />
           </div>
         </div>
+      </GameStage>
 
-        {/* Resolution Modal */}
-        {showResolutionResult && gameState.last_resolution && (
-          <ResolutionModal
-            result={gameState.last_resolution}
-            gameState={gameState}
-            viewingPlayer={currentViewingPlayer}
-            onDismiss={handleResolutionDismiss}
-          />
-        )}
+      {/* Resolution Modal */}
+      {showResolutionResult && gameState.last_resolution && (
+        <ResolutionModal
+          result={gameState.last_resolution}
+          gameState={gameState}
+          viewingPlayer={currentViewingPlayer}
+          onDismiss={handleResolutionDismiss}
+        />
+      )}
 
-        {/* Hot-Seat Handoff Screen — renders on top of everything */}
-        {pendingHandoff && (
-          <HandoffScreen toPlayer={pendingHandoff} onReady={confirmHandoff} />
-        )}
+      {/* Hot-Seat Handoff Screen */}
+      {pendingHandoff && (
+        <HandoffScreen toPlayer={pendingHandoff} onReady={confirmHandoff} />
+      )}
 
-        {/* Match End Modal */}
-        {gameState.phase === 'MATCH_END' && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-            <div className="bg-gray-900 border-2 border-yellow-500 rounded-2xl p-6 sm:p-8 w-full max-w-md text-center">
-              <div className="text-6xl mb-4">🏆</div>
-              <h2 className="text-3xl sm:text-4xl font-black text-yellow-400 mb-3">
-                {gameState.winner === currentViewingPlayer ? 'YOU WIN!' : 'GAME OVER'}
-              </h2>
-              <div className="text-2xl text-white font-bold mb-4">
-                {gameState.player1_score} – {gameState.player2_score}
-              </div>
-              <p className="text-gray-400 mb-6">
-                {gameState.winner === 'player1' ? 'Player 1' : 'Player 2'} wins!
-              </p>
-              <button
-                onClick={() => {
-                  resetGame();
-                  router.push('/roster');
-                }}
-                className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold text-lg transition-all min-h-[56px]"
-              >
-                🎮 New Game
-              </button>
+      {/* Match End Modal — themed */}
+      {gameState.phase === 'MATCH_END' && (
+        <div className="game-end-overlay">
+          <div className="game-end-card">
+            <div className="trophy">🏆</div>
+            <h2>{gameState.winner === currentViewingPlayer ? 'You Win!' : 'Game Over'}</h2>
+            <div className="final-score">
+              {gameState.player1_score} – {gameState.player2_score}
             </div>
+            <p>
+              {gameState.winner === 'player1' ? 'Player 1' : 'Player 2'} wins
+            </p>
+            <button
+              onClick={() => {
+                resetGame();
+                router.push('/roster');
+              }}
+              className="new-game-btn"
+            >
+              🎮 New Game
+            </button>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

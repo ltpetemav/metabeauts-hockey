@@ -67,17 +67,10 @@ export function ActionCardUI({
 
   if (isFaceDown) {
     return (
-      <div
-        className={`
-          ${sizeClasses[size]}
-          rounded-xl border-2 border-gray-600 bg-gradient-to-br from-gray-800 to-gray-700
-          flex items-center justify-center cursor-default select-none
-          shadow-lg
-        `}
-      >
+      <div className={`${sizeClasses[size]} mb-actioncard mb-actioncard-back`}>
         <div className="text-center">
           <div className="text-2xl">🔒</div>
-          <div className="text-gray-400 text-xs mt-1">MB:H</div>
+          <div className="mb-actioncard-back-label">MB:H</div>
         </div>
       </div>
     );
@@ -96,24 +89,22 @@ export function ActionCardUI({
     <div
       className={`
         ${sizeClasses[size]}
-        rounded-xl border-2 bg-gradient-to-br cursor-pointer select-none
+        mb-actioncard rounded-xl border-2 bg-gradient-to-br cursor-pointer select-none
         flex flex-col items-center justify-between p-2
-        transition-all duration-150 hover:scale-105 shadow-lg
+        transition-all duration-150 hover:scale-105
         ${colorClass}
-        ${isSelected ? 'ring-2 ring-white scale-110 shadow-white/30' : ''}
+        ${isSelected ? 'mb-actioncard-selected' : ''}
         ${disabled ? 'opacity-40 cursor-not-allowed hover:scale-100' : ''}
-        ${highlighted ? 'ring-2 ring-yellow-400 animate-pulse' : ''}
+        ${highlighted ? 'mb-actioncard-highlighted' : ''}
       `}
       onClick={disabled ? undefined : onClick}
       title={description}
     >
       <div className="text-2xl">{icon}</div>
       <div className="text-center">
-        <div className="font-bold text-white leading-tight">{displayType}</div>
+        <div className="mb-actioncard-name">{displayType}</div>
         {size !== 'sm' && (
-          <div className="text-gray-300 text-xs mt-0.5 leading-tight line-clamp-2">
-            {description}
-          </div>
+          <div className="mb-actioncard-desc line-clamp-2">{description}</div>
         )}
       </div>
     </div>
@@ -128,25 +119,19 @@ export function CardPile({ count, onClick }: { count: number; onClick?: () => vo
       onClick={onClick}
       title={`${count} cards remaining`}
     >
-      {count > 2 && (
-        <div className="absolute top-1.5 left-1.5 w-16 h-20 rounded-xl border-2 border-gray-600 bg-gray-800/60" />
-      )}
-      {count > 1 && (
-        <div className="absolute top-1 left-1 w-16 h-20 rounded-xl border-2 border-gray-600 bg-gray-800/70" />
-      )}
+      {count > 2 && <div className="mb-cardpile-shadow" style={{ top: '6px', left: '6px' }} />}
+      {count > 1 && <div className="mb-cardpile-shadow" style={{ top: '3px', left: '3px' }} />}
       {count > 0 ? (
-        <div className="relative w-16 h-20 rounded-xl border-2 border-gray-500 bg-gradient-to-br from-gray-800 to-gray-700 flex items-center justify-center shadow-lg group-hover:border-gray-300 transition-colors">
+        <div className="mb-cardpile">
           <div className="text-center">
             <div className="text-xl">🔒</div>
-            <div className="text-white font-bold text-sm">{count}</div>
+            <div className="mb-cardpile-count">{count}</div>
           </div>
         </div>
       ) : (
-        <div className="w-16 h-20 rounded-xl border-2 border-dashed border-red-700 bg-red-950/30 flex items-center justify-center">
-          <div className="text-red-400 text-xs text-center">
-            <div>💀</div>
-            <div>Empty</div>
-          </div>
+        <div className="mb-cardpile-empty">
+          <div>💀</div>
+          <div>Empty</div>
         </div>
       )}
     </div>
