@@ -56,7 +56,7 @@ function TutorialGameContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-blue-950 px-3 py-3 sm:p-4 pb-48 sm:pb-36"
+    <div className="min-h-screen px-3 py-3 sm:p-4 pb-48 sm:pb-36"
       style={{ paddingTop: `max(env(safe-area-inset-top), 12px)` }}
     >
       <div className="max-w-7xl mx-auto">

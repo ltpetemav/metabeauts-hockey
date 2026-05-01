@@ -80,7 +80,7 @@ export default function RosterPage() {
   const canStart = rosterSelection.player1.length === 6 && rosterSelection.player2.length === 6;
 
   return (
-    <div className="min-h-screen bg-gray-950"
+    <div className="min-h-screen"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {/* Fixed top bar on mobile */}

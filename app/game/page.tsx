@@ -54,7 +54,7 @@ export default function GamePage() {
 
   return (
     <div
-      className="min-h-screen bg-gradient-to-b from-gray-950 to-blue-950"
+      className="min-h-screen"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="max-w-7xl mx-auto px-3 py-3 md:p-4">

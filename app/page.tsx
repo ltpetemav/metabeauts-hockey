@@ -22,7 +22,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#071226] overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden">
       {/* ═══ HERO SECTION ═══ */}
       <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
         {/* Background layers */}

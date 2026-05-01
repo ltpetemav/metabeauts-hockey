@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Bebas_Neue, JetBrains_Mono, Oswald, Press_Start_2P, VT323 } from 'next/font/google';
+import MbNav from '@/components/ui/MbNav';
 import '../globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -31,7 +32,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={fontClasses}>
-      <body data-preset="hud" className="overflow-x-hidden">{children}</body>
+      <body data-preset="hud" className="overflow-x-hidden">
+        <MbNav />
+        {children}
+      </body>
     </html>
   );
 }

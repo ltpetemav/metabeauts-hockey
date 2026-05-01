@@ -22,7 +22,7 @@ export default function RulesPage() {
   const [activeSection, setActiveSection] = useState<Section>('overview');
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-blue-950"
+    <div className="min-h-screen"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="max-w-4xl mx-auto px-3 py-3 sm:p-4">
