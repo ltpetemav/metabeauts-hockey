@@ -261,7 +261,7 @@ export default function RosterPage() {
             <button
               onClick={() => {
                 startGame();
-                router.push('/pregame');
+                router.push('/game');
               }}
               className="start-btn"
             >

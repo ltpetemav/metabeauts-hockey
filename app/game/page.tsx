@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/store/gameStore';
 import { ScoreBoard } from '@/components/ui/ScoreBoard';
@@ -31,16 +31,6 @@ export default function GamePage() {
     setActiveDefensiveBeaut,
     resetGame,
   } = useGameStore();
-
-  // Phase routing: bounce to /pregame if still in RPS, /results if MATCH_END
-  useEffect(() => {
-    if (!gameState) return;
-    if (gameState.phase === 'RPS') {
-      router.replace('/pregame');
-    } else if (gameState.phase === 'MATCH_END') {
-      router.replace('/results');
-    }
-  }, [gameState, gameState?.phase, router]);
 
   if (!gameState) {
     return (
