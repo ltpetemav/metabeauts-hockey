@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Bebas_Neue, JetBrains_Mono, Oswald, Press_Start_2P, VT323 } from 'next/font/google';
 import MbNav from '@/components/ui/MbNav';
+import ThemeSwitcher from '@/components/ui/ThemeSwitcher';
 import '../globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -35,6 +36,7 @@ export default function RootLayout({
       <body data-preset="hud" className="overflow-x-hidden">
         <MbNav />
         {children}
+        <ThemeSwitcher />
       </body>
     </html>
   );
