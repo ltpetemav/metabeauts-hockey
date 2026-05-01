@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/store/gameStore';
 import { ScoreBoard } from '@/components/ui/ScoreBoard';
@@ -31,6 +31,13 @@ export default function GamePage() {
     setActiveDefensiveBeaut,
     resetGame,
   } = useGameStore();
+
+  // Phase 9 step A: route to /results when match ends
+  useEffect(() => {
+    if (gameState?.phase === 'MATCH_END') {
+      router.replace('/results');
+    }
+  }, [gameState?.phase, router]);
 
   if (!gameState) {
     return (
