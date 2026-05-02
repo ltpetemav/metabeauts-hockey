@@ -185,17 +185,23 @@ export default function RosterPage() {
                         addBeautToRoster(browsingPlayer, beaut);
                       }
                     }}
-                    style={{ display: 'flex', flexDirection: 'column' }}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      minHeight: '260px',
+                    }}
                   >
                     <div
                       className="ph"
                       style={{
                         position: 'relative',
                         width: '100%',
-                        height: 'min(56vw, 280px)',
+                        height: '220px',
+                        minHeight: '220px',
+                        maxHeight: '220px',
                         overflow: 'hidden',
                         background: '#000',
-                        flexShrink: 0,
+                        flex: '0 0 220px',
                       }}
                     >
                       <div className={`pos-tag ${POSITION_TAG[beaut.position]}`}>{POSITION_TAG[beaut.position]}</div>
