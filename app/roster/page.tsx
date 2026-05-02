@@ -185,14 +185,32 @@ export default function RosterPage() {
                         addBeautToRoster(browsingPlayer, beaut);
                       }
                     }}
+                    style={{ display: 'flex', flexDirection: 'column' }}
                   >
-                    <div className="ph">
+                    <div
+                      className="ph"
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: 'min(56vw, 280px)',
+                        overflow: 'hidden',
+                        background: '#000',
+                        flexShrink: 0,
+                      }}
+                    >
                       <div className={`pos-tag ${POSITION_TAG[beaut.position]}`}>{POSITION_TAG[beaut.position]}</div>
                       <div className={`tier-tag t${tier}`}>T{tier}</div>
                       <img
                         src={beaut.image_url}
                         alt={beaut.name}
                         loading="lazy"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center 20%',
+                          display: 'block',
+                        }}
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' fill='%23374151'><rect width='100' height='100'/><text x='50' y='55' text-anchor='middle' fill='%239ca3af' font-size='14'>${beaut.token_id ?? '?'}</text></svg>`;
                         }}
