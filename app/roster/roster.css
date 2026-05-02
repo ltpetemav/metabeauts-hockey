@@ -563,3 +563,43 @@ body:has(.roster-stage) .text-white { color: var(--text); }
 body:has(.roster-stage) .text-gray-300,
 body:has(.roster-stage) .text-gray-400,
 body:has(.roster-stage) .text-gray-500 { color: var(--text-dim); }
+
+/* ─── Mobile fixes for roster ─── */
+@media (max-width: 1023px) {
+  /* Summary sidebar moves BEFORE the browser on mobile */
+  .roster-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .roster-summary {
+    order: 1;
+    /* Sticky on mobile so user can see selections while scrolling beaut grid */
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    backdrop-filter: blur(12px);
+    padding: 12px 14px;
+    max-height: 38vh;
+    overflow-y: auto;
+  }
+  .roster-summary h3 { font-size: 18px; margin-bottom: 2px; }
+  .roster-summary .sub { font-size: 10px; margin-bottom: 8px; }
+  .pos-section { margin-top: 8px; padding-top: 8px; }
+  .pos-section .pos-label { font-size: 9px; }
+  .opp-summary { margin-top: 10px; padding-top: 10px; }
+  .opp-summary .opp-count { font-size: 24px; }
+  .start-btn { padding: 12px 18px; font-size: 16px; margin-top: 10px; }
+  .start-locked { margin-top: 10px; padding: 10px; }
+
+  .roster-browser { order: 2; }
+}
+
+@media (max-width: 768px) {
+  .roster-stage { padding: 12px 14px 32px; }
+  .roster-header h1 { font-size: 22px; }
+  .roster-header .crumb { padding: 6px 10px; font-size: 10px; }
+  .browse-search { max-width: 100%; }
+  .browse-filters { gap: 4px; }
+  .browse-chip { padding: 6px 10px; font-size: 9px; min-height: 32px; }
+  .mode-btn { font-size: 10px; padding: 8px 12px; min-height: 38px; }
+}

@@ -269,3 +269,57 @@
   justify-content: center;
   padding: 12px 0 4px;
 }
+
+/* ─── Mobile fixes for results ─── */
+@media (max-width: 1023px) {
+  .mid-row { grid-template-columns: 1fr; gap: 12px; }
+}
+
+@media (max-width: 768px) {
+  .results-stage { padding: 14px 14px 32px; gap: 12px; }
+  .results-hero { padding: 22px 16px; border-radius: 16px; }
+  .hero-grid { grid-template-columns: 1fr; gap: 14px; }
+  .hero-side { flex-direction: row; gap: 12px; align-items: center; justify-content: center; }
+  .hero-badge { width: 60px; height: 60px; font-size: 24px; border-radius: 14px; }
+  .hero-name { font-size: 22px; }
+  .hero-score { font-size: 80px; }
+  .hero-final { font-size: 56px; }
+  .period-strip { flex-wrap: wrap; justify-content: center; }
+  .period { min-width: 48px; padding: 4px 10px; }
+  .period .v { font-size: 16px; }
+
+  /* Stats table: simplify columns + allow horizontal scroll */
+  .stats-table { padding: 10px 12px; }
+  .stats-row {
+    grid-template-columns: 36px 1.2fr repeat(5, .5fr) .7fr;
+    gap: 6px;
+    padding: 6px 4px;
+    font-size: 10px;
+  }
+  .stats-row .cap { width: 30px; height: 30px; }
+  .stats-row .nm { font-size: 9px; }
+  .stats-row .nm b { font-size: 11px; }
+  .stats-row .v, .stats-row .p { font-size: 12px; }
+  .stats-row.head { font-size: 7px; }
+
+  /* MVP card scales down */
+  .mvp-section { grid-template-columns: 1fr; gap: 14px; padding: 16px; }
+  .mvp-card { width: 100%; max-width: 240px; height: auto; aspect-ratio: 5/7; margin: 0 auto; }
+
+  .rewards-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .reward { padding: 12px; }
+  .reward .icon { font-size: 22px; }
+  .reward .v { font-size: 26px; }
+  .reward .l { font-size: 9px; }
+  .reward .d { font-size: 9px; }
+
+  .results-actions { flex-wrap: wrap; }
+}
+
+@media (max-width: 480px) {
+  .hero-score { font-size: 64px; }
+  .hero-final { font-size: 42px; }
+  .stats-row {
+    grid-template-columns: 30px 1fr repeat(5, .45fr) .65fr;
+  }
+}

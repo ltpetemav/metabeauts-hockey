@@ -549,3 +549,55 @@ body[data-preset="topps"] .mb-actioncard-back {
   letter-spacing: .1em;
   text-transform: uppercase;
 }
+
+/* ─── Mobile optimizations (Phase 10) ─── */
+
+/* MbNav: tighten on mobile, hide wallet pill on small screens, allow links to wrap or scroll */
+@media (max-width: 768px) {
+  .mb-nav {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .mb-nav-logo .mark { width: 24px; height: 24px; }
+  .mb-nav-logo .mark svg { width: 14px; height: 14px; }
+  .mb-nav-logo > span:last-child { font-size: 16px; letter-spacing: .12em; }
+  .mb-nav-links {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    gap: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .mb-nav-links::-webkit-scrollbar { display: none; }
+  .mb-nav-links a {
+    padding: 6px 10px;
+    font-size: 9px;
+    letter-spacing: .12em;
+    flex-shrink: 0;
+  }
+  .mb-nav-wallet {
+    padding: 5px 9px;
+    font-size: 9px;
+    letter-spacing: .04em;
+  }
+}
+
+/* Theme switcher: respect safe-area on iOS, smaller on mobile */
+@media (max-width: 768px) {
+  body > div[style*="position: fixed"][style*="bottom"] {
+    bottom: max(env(safe-area-inset-bottom), 12px) !important;
+    right: 12px !important;
+  }
+}
+
+/* BeautCard mb-card-info: tighten on mobile */
+@media (max-width: 480px) {
+  .mb-card-info { padding: 4px 6px; }
+  .mb-card-name { font-size: 11px; }
+  .mb-card-pos { font-size: 8px; }
+  .mb-card-tier-badge { font-size: 8px; padding: 1px 5px; }
+  .mb-card-trait-name { font-size: 9px; }
+}

@@ -617,3 +617,44 @@ body:has(.game-stage) .max-w-lg.rounded-2xl {
 body[data-preset="topps"] body:has(.game-stage) .text-white { color: #1a0f08; }
 body[data-preset="topps"] body:has(.game-stage) .text-gray-300,
 body[data-preset="topps"] body:has(.game-stage) .text-gray-400 { color: rgba(28, 15, 8, .65); }
+
+/* ─── Mobile fixes for game ─── */
+@media (max-width: 768px) {
+  .game-stage-frame { padding: 8px; gap: 6px; }
+
+  .game-topbar {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .game-topbar .left-meta,
+  .game-topbar .right-meta {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .game-logo { justify-content: center; }
+  .game-logo-mark { width: 24px; height: 24px; }
+  .game-logo-name { font-size: 14px; }
+  .game-logo-sub { font-size: 7px; }
+
+  .live-pill { font-size: 9px; padding: 4px 9px; letter-spacing: .12em; }
+  .game-header .crumb { font-size: 9px; padding: 5px 10px; }
+
+  /* Jumbotron pulls in tighter */
+  .jumbo { padding: 10px; }
+  .jumbo-grid { gap: 6px; }
+  .jb-team { gap: 6px; }
+  .jb-badge { width: 30px; height: 30px; font-size: 14px; }
+  .jb-name { font-size: 11px; }
+  .jb-meta { font-size: 8px; gap: 4px; }
+  .jb-score { font-size: 44px; }
+  .jb-vs { font-size: 14px; }
+  .jb-period { font-size: 8px; }
+  .jb-shot { font-size: 8px; padding: 2px 6px; }
+  .jb-phase { font-size: 7px; max-width: 90px; }
+
+  /* End-of-match modal */
+  .game-end-card { padding: 22px; }
+  .game-end-card h2 { font-size: 28px; }
+  .game-end-card .final-score { font-size: 44px; }
+}
